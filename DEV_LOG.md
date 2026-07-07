@@ -73,3 +73,49 @@
 
 - FLAC/M4A/WAV 暂时先走文件名识别兜底，尚未读取其内部元数据。
 - 音乐库目录暂时固定为 `D:\OnePlusMusic\Library`，后续可做用户自选目录。
+
+### Phase 4：Windows 端歌单和播放
+
+已完成：
+
+- Windows 端首页显示全部歌曲、待整理音频、歌单列表和当前歌单内容。
+- 支持搜索歌曲标题、歌手、专辑、原始文件名和歌单名。
+- 支持新建、重命名、删除歌单；删除歌单前会确认，且不会删除主库歌曲或音频文件。
+- 支持把歌曲加入当前歌单，并支持从歌单移除歌曲。
+- 支持从全部歌曲、待整理音频和歌单内容中播放本地文件。
+- 支持暂停、继续和停止当前播放，并把播放错误显示到状态栏。
+- 歌单面板已改成可伸缩布局，避免小窗口或测试窗口高度不足时溢出。
+
+验证：
+
+- `apps\windows_app`：`flutter analyze` 通过。
+- `apps\windows_app`：`flutter test` 通过。
+- `packages\database`：`flutter test` 通过。
+
+当前限制：
+
+- Windows 本地播放先使用系统 MCI 播放能力封装，真实格式兼容性仍需在 Phase 7 用 MP3、FLAC、M4A、WAV 实测。
+- 尚未进入 Phase 5 的 Wi-Fi 同步模式实现。
+
+### Phase 5：Windows 端同步模式
+
+已完成：
+
+- `packages\sync_protocol` 从模板占位改为同步协议模型，包含二维码载荷、连接请求和连接响应。
+- Windows 端新增手动开启/关闭 Wi-Fi 同步模式。
+- 开启同步模式时会启动本地 HTTP 服务，生成临时 `session_id`、6 位连接码、局域网地址和二维码载荷。
+- Windows 首页显示连接地址、连接码、二维码和二维码原始载荷。
+- 同步服务已实现连接验证接口、歌单列表接口、歌单同步清单接口和按 `songId` 下载音频文件接口。
+- 下载接口只允许下载数据库中存在的歌曲文件，不接受任意本地路径。
+
+验证：
+
+- `packages\sync_protocol`：`flutter analyze` 通过。
+- `packages\sync_protocol`：`flutter test` 通过。
+- `apps\windows_app`：`flutter analyze` 通过。
+- `apps\windows_app`：`flutter test` 通过，覆盖连接验证、歌单列表、同步清单和文件下载。
+
+当前限制：
+
+- Phase 5 的 Windows 服务骨架已完成，但尚未用 Android 端扫码联调。
+- 目前二维码已生成并显示，Android 端解析和下载流程留到 Phase 6 继续。

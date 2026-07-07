@@ -92,6 +92,16 @@ void main() {
       'song-1',
     );
   });
+
+  test('searches playlists by name', () {
+    database.playlists.upsert(_playlist(id: 'playlist-1', name: 'Road Trip'));
+    database.playlists.upsert(_playlist(id: 'playlist-2', name: 'Evening'));
+
+    final result = database.search.searchPlaylists('road');
+
+    expect(result, hasLength(1));
+    expect(result.single.id, 'playlist-1');
+  });
 }
 
 Song _song({required String id, required String title}) {

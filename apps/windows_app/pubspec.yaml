@@ -39,7 +39,11 @@ dependencies:
     path: ../../packages/core
   music_database:
     path: ../../packages/database
+  music_sync_protocol:
+    path: ../../packages/sync_protocol
   path: ^1.9.1
+  ffi: ^2.2.0
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:

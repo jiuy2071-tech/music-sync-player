@@ -9,7 +9,7 @@ V1 只做同一 Wi-Fi 下扫码同步，不做云同步、远程在线播放、U
 
 ## 当前状态
 
-当前完成到 Phase 2：
+当前完成到 Phase 5：
 
 - 已整理项目文档。
 - 已创建 monorepo 基础目录。
@@ -22,6 +22,11 @@ V1 只做同一 Wi-Fi 下扫码同步，不做云同步、远程在线播放、U
 - Windows 端已支持导入音频文件和文件夹。
 - Windows 端导入会复制音乐到 `D:\OnePlusMusic\Library\audio`。
 - Windows 端已显示全部歌曲、待整理音频、搜索框和导入结果。
+- Windows 端已支持新建、重命名、删除歌单。
+- Windows 端已支持把歌曲加入歌单、从歌单移除。
+- Windows 端已支持基础本地播放、暂停、继续和停止。
+- Windows 端已支持手动开启 Wi-Fi 同步模式，生成连接码和二维码。
+- Windows 端已提供连接验证、歌单列表、同步清单和音频下载接口。
 
 原中文路径触发 Windows 构建乱码问题后，项目已复制到纯英文路径：
 
@@ -103,14 +108,14 @@ Windows 构建工具用来把 Windows 端 APP 打包成可以双击启动的 exe
 flutter doctor -v
 ```
 
-## 后续 Phase 1 目标
+## 后续目标
 
-环境准备好后，继续完成：
+下一步继续完成：
 
-1. Phase 4：Windows 端创建、重命名、删除歌单。
-2. Phase 4：Windows 端把歌曲加入歌单、从歌单移除。
-3. Phase 4：Windows 端本地播放歌曲。
-4. Phase 5：Windows 端开启 Wi-Fi 同步模式。
+1. Phase 6：Android 端扫码连接 Windows 端。
+2. Phase 6：Android 端展示 Windows 端歌单并选择整个歌单同步。
+3. Phase 6：Android 端下载音频到 APP 本地目录并写入本地数据库。
+4. Phase 6：Android 端展示已同步内容、搜索并离线播放。
 
 ## 当前验证结果
 

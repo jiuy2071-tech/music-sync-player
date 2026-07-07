@@ -2,6 +2,7 @@ name: music_sync_protocol
 description: "A new Flutter package project."
 version: 0.0.1
 homepage:
+publish_to: 'none'
 
 environment:
   sdk: ^3.12.2
@@ -10,6 +11,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  music_core:
+    path: ../core
 
 dev_dependencies:
   flutter_test:
