@@ -19,6 +19,9 @@ V1 只做同一 Wi-Fi 下扫码同步，不做云同步、远程在线播放、U
 - Android Flutter APP 已生成并能构建 debug APK。
 - 共享核心模型已实现。
 - SQLite 数据库初始化、基础表、仓库和搜索已实现。
+- Windows 端已支持导入音频文件和文件夹。
+- Windows 端导入会复制音乐到 `D:\OnePlusMusic\Library\audio`。
+- Windows 端已显示全部歌曲、待整理音频、搜索框和导入结果。
 
 原中文路径触发 Windows 构建乱码问题后，项目已复制到纯英文路径：
 
@@ -104,11 +107,10 @@ flutter doctor -v
 
 环境准备好后，继续完成：
 
-1. Phase 3：Windows 端选择音频文件/文件夹。
-2. Phase 3：导入时复制音频到音乐库 `audio` 目录。
-3. Phase 3：计算文件 hash，跳过重复文件。
-4. Phase 3：实现元数据/文件名识别和“未命名音频 001”规则。
-5. Phase 3：把导入结果写入 SQLite。
+1. Phase 4：Windows 端创建、重命名、删除歌单。
+2. Phase 4：Windows 端把歌曲加入歌单、从歌单移除。
+3. Phase 4：Windows 端本地播放歌曲。
+4. Phase 5：Windows 端开启 Wi-Fi 同步模式。
 
 ## 当前验证结果
 

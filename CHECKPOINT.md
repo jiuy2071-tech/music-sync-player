@@ -19,7 +19,7 @@ D:\Projects\music_sync_player
 
 ## 当前阶段
 
-下一步从 Phase 3 继续：Windows 端音频导入。
+下一步从 Phase 4 继续：Windows 端歌单和播放。
 
 ## 常用验证命令
 

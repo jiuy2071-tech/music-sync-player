@@ -54,7 +54,10 @@ class AudioImportService {
         }
 
         final songId = 'song_${hash.substring(0, min(16, hash.length))}';
-        final targetPath = p.join(library.audioPath, '$songId.${format.extension}');
+        final targetPath = p.join(
+          library.audioPath,
+          '$songId.${format.extension}',
+        );
         await file.copy(targetPath);
 
         final stat = await file.stat();
@@ -103,7 +106,10 @@ class AudioImportService {
     }
 
     final paths = <String>[];
-    await for (final entity in folder.list(recursive: true, followLinks: false)) {
+    await for (final entity in folder.list(
+      recursive: true,
+      followLinks: false,
+    )) {
       if (entity is File &&
           AudioFormat.fromExtension(p.extension(entity.path)) != null) {
         paths.add(entity.path);
@@ -124,10 +130,13 @@ class MusicLibraryLocation {
   String get databasePath => p.join(rootPath, 'library.db');
 
   static Future<MusicLibraryLocation> resolve() async {
-    final appData = Platform.environment['APPDATA'];
-    final base = appData == null || appData.isEmpty
-        ? p.join(Directory.current.path, 'library')
-        : p.join(appData, 'OnePlusMusic', 'Library');
+    final configured = Platform.environment['ONEPLUS_MUSIC_LIBRARY'];
+    if (configured != null && configured.trim().isNotEmpty) {
+      return MusicLibraryLocation(rootPath: configured.trim());
+    }
+    final base = Directory('D:\\').existsSync()
+        ? p.join('D:\\', 'OnePlusMusic', 'Library')
+        : p.join(Directory.current.path, 'library');
     return MusicLibraryLocation(rootPath: base);
   }
 
@@ -175,16 +184,11 @@ if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
       script,
     ]);
     if (result.exitCode != 0) {
-      throw AppError(
-        'file_dialog_failed',
-        '打开文件选择窗口失败',
-        cause: result.stderr,
-      );
+      throw AppError('file_dialog_failed', '打开文件选择窗口失败', cause: result.stderr);
     }
-    return LineSplitter.split(result.stdout.toString())
-        .map((line) => line.trim())
-        .where((line) => line.isNotEmpty)
-        .toList();
+    return LineSplitter.split(
+      result.stdout.toString(),
+    ).map((line) => line.trim()).where((line) => line.isNotEmpty).toList();
   }
 }
 
@@ -219,7 +223,10 @@ Future<SongMetadata> _readMp3Id3v2Metadata(File file) async {
     String? album;
 
     while (offset + 10 <= bytes.length) {
-      final frameId = ascii.decode(bytes.sublist(offset, offset + 4), allowInvalid: true);
+      final frameId = ascii.decode(
+        bytes.sublist(offset, offset + 4),
+        allowInvalid: true,
+      );
       final frameSize = _frameSize(bytes.sublist(offset + 4, offset + 8));
       if (frameSize <= 0 || offset + 10 + frameSize > bytes.length) {
         break;
@@ -268,7 +275,10 @@ String? _decodeTextFrame(List<int> frame) {
   final payload = frame.sublist(1);
   try {
     if (encoding == 0 || encoding == 3) {
-      return utf8.decode(payload, allowMalformed: true).replaceAll('\u0000', '').trim();
+      return utf8
+          .decode(payload, allowMalformed: true)
+          .replaceAll('\u0000', '')
+          .trim();
     }
     if (encoding == 1 || encoding == 2) {
       return String.fromCharCodes(payload).replaceAll('\u0000', '').trim();
