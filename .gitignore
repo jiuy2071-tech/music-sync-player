@@ -1,0 +1,54 @@
+# Flutter / Dart
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec_overrides.yaml
+
+# Build outputs
+build/
+release/
+
+# Android / Gradle
+.gradle/
+local.properties
+captures/
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+
+# Generated app artifacts
+*.apk
+*.aab
+*.ipa
+*.app
+*.exe
+*.dll
+*.pdb
+*.so
+*.dylib
+
+# Archives and large temporary downloads
+*.zip
+*.7z
+*.rar
+*.tar
+*.gz
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.bak
+Thumbs.db
+.DS_Store
+
+# Local music library data
+library/
+audio/
+*.db
+*.sqlite
+*.sqlite3
+
