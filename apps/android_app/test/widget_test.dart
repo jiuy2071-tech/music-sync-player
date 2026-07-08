@@ -18,6 +18,7 @@ void main() {
 
     expect(find.text('壹加音乐 - Android 随身库'), findsOneWidget);
     expect(find.text('同步音乐'), findsOneWidget);
+    expect(find.text('扫码'), findsOneWidget);
     expect(find.text('连接电脑端'), findsOneWidget);
     expect(find.byIcon(Icons.search), findsOneWidget);
     expect(find.text('暂无已同步歌单'), findsOneWidget);

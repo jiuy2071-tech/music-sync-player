@@ -184,3 +184,22 @@
 - 真实 Windows 文件选择器和文件夹选择器操作仍需手动点选确认。
 - Windows 和 Android 真机同 Wi-Fi 联调仍需手动确认。
 - Android 断网或关闭 Windows 同步模式后的离线播放仍需真机确认。
+
+### Android 扫码连接
+
+已完成：
+
+- Android 端新增扫码入口，位于“同步音乐”区域。
+- 用户可以点击“扫码”打开摄像头扫描 Windows 端二维码。
+- 扫码识别到合法同步二维码后，会复用现有连接 Windows 同步服务流程。
+- 保留“粘贴”和“连接电脑端”手动备用方式，扫码失败时仍可手动输入二维码载荷。
+- Android Manifest 已增加 Camera 权限。
+- 新增 `mobile_scanner` 依赖，用于通过手机摄像头识别二维码；它是常见的 Flutter 扫码插件，Android 端使用 MLKit 做本地识别。
+
+验证：
+
+- `apps\android_app`：`flutter analyze` 通过。
+- `apps\android_app`：`flutter test` 通过。
+- `apps\android_app`：`flutter build apk --debug` 通过，产物为 `apps\android_app\build\app\outputs\flutter-apk\app-debug.apk`。
+- 第一次构建时 Gradle 下载 `mobile_scanner` 相关 Android/Kotlin 依赖遇到 TLS 握手失败；用 PowerShell 成功访问对应 Maven 地址后重试构建通过。
+- 当前环境无法真实打开手机摄像头，因此真机扫码仍需安装 APK 后人工确认。

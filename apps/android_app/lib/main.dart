@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:music_core/music_core.dart';
 import 'package:music_database/music_database.dart';
 import 'package:music_sync_protocol/music_sync_protocol.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'android_audio_player.dart';
 import 'android_library.dart';
@@ -130,6 +131,10 @@ class _AndroidHomePageState extends State<AndroidHomePage> {
   }
 
   Future<void> _connectToWindows() async {
+    await _connectWithPayloadText(_payloadController.text.trim());
+  }
+
+  Future<void> _connectWithPayloadText(String payloadText) async {
     if (_busy) {
       return;
     }
@@ -139,12 +144,13 @@ class _AndroidHomePageState extends State<AndroidHomePage> {
     });
 
     try {
-      final payload = SyncQrPayload.fromJsonText(_payloadController.text.trim());
+      final payload = SyncQrPayload.fromJsonText(payloadText);
       await _syncClient.connect(payload);
       final playlists = await _syncClient.fetchPlaylists(payload);
       if (!mounted) {
         return;
       }
+      _payloadController.text = payloadText;
       setState(() {
         _connectedPayload = payload;
         _remotePlaylists = playlists;
@@ -160,6 +166,19 @@ class _AndroidHomePageState extends State<AndroidHomePage> {
         _busy = false;
       });
     }
+  }
+
+  Future<void> _scanPayload() async {
+    if (_busy) {
+      return;
+    }
+    final payloadText = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (context) => const _QrScanPage()),
+    );
+    if (!mounted || payloadText == null || payloadText.trim().isEmpty) {
+      return;
+    }
+    await _connectWithPayloadText(payloadText.trim());
   }
 
   Future<void> _syncPlaylist(RemotePlaylist playlist) async {
@@ -278,6 +297,7 @@ class _AndroidHomePageState extends State<AndroidHomePage> {
                 busy: _busy,
                 status: _status,
                 onPaste: _pastePayload,
+                onScan: _scanPayload,
                 onConnect: _connectToWindows,
               ),
               const SizedBox(height: 12),
@@ -333,6 +353,7 @@ class _ConnectionPanel extends StatelessWidget {
     required this.busy,
     required this.status,
     required this.onPaste,
+    required this.onScan,
     required this.onConnect,
   });
 
@@ -340,6 +361,7 @@ class _ConnectionPanel extends StatelessWidget {
   final bool busy;
   final String status;
   final VoidCallback onPaste;
+  final VoidCallback onScan;
   final VoidCallback onConnect;
 
   @override
@@ -376,6 +398,11 @@ class _ConnectionPanel extends StatelessWidget {
                   icon: const Icon(Icons.content_paste),
                   label: const Text('粘贴'),
                 ),
+                OutlinedButton.icon(
+                  onPressed: busy ? null : onScan,
+                  icon: const Icon(Icons.qr_code_scanner),
+                  label: const Text('扫码'),
+                ),
                 FilledButton.icon(
                   onPressed: busy ? null : onConnect,
                   icon: const Icon(Icons.link),
@@ -393,6 +420,75 @@ class _ConnectionPanel extends StatelessWidget {
             Text(status),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _QrScanPage extends StatefulWidget {
+  const _QrScanPage();
+
+  @override
+  State<_QrScanPage> createState() => _QrScanPageState();
+}
+
+class _QrScanPageState extends State<_QrScanPage> {
+  bool _handled = false;
+
+  void _handleDetect(BarcodeCapture capture) {
+    if (_handled) {
+      return;
+    }
+    for (final barcode in capture.barcodes) {
+      final value = barcode.rawValue?.trim();
+      if (value == null || value.isEmpty) {
+        continue;
+      }
+      try {
+        SyncQrPayload.fromJsonText(value);
+      } catch (_) {
+        continue;
+      }
+      _handled = true;
+      Navigator.of(context).pop(value);
+      return;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('扫描 Windows 同步二维码')),
+      body: Stack(
+        children: [
+          MobileScanner(
+            onDetect: _handleDetect,
+            errorBuilder: (context, error) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    '无法打开摄像头：${error.errorDetails?.message ?? error.errorCode.message}',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              );
+            },
+          ),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Container(
+              width: double.infinity,
+              color: Colors.black54,
+              padding: const EdgeInsets.all(16),
+              child: const Text(
+                '请将 Windows 端显示的二维码放入取景框',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
