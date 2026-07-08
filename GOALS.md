@@ -20,7 +20,7 @@
 - [x] Phase 3：Windows 端音频导入。
 - [x] Phase 4：Windows 端歌单和播放。
 - [x] Phase 5：Windows 端同步模式。
-- [ ] Phase 6：Android 端同步和本地播放。
+- [x] Phase 6：Android 端同步和本地播放。
 - [ ] Phase 7：验收、修复和 release 交付。
 
 ## 范围边界

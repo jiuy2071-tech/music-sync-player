@@ -191,6 +191,10 @@ class PlaylistRepository {
     );
   }
 
+  void clearSongs(String playlistId) {
+    _db.execute('DELETE FROM playlist_items WHERE playlist_id = ?', [playlistId]);
+  }
+
   List<Song> songsForPlaylist(String playlistId) {
     final result = _db.select(
       '''

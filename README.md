@@ -9,7 +9,7 @@ V1 只做同一 Wi-Fi 下扫码同步，不做云同步、远程在线播放、U
 
 ## 当前状态
 
-当前完成到 Phase 5：
+当前完成到 Phase 6：
 
 - 已整理项目文档。
 - 已创建 monorepo 基础目录。
@@ -27,6 +27,9 @@ V1 只做同一 Wi-Fi 下扫码同步，不做云同步、远程在线播放、U
 - Windows 端已支持基础本地播放、暂停、继续和停止。
 - Windows 端已支持手动开启 Wi-Fi 同步模式，生成连接码和二维码。
 - Windows 端已提供连接验证、歌单列表、同步清单和音频下载接口。
+- Android 端已支持解析二维码载荷、连接 Windows 端并显示电脑端歌单。
+- Android 端已支持按整张歌单同步到 APP 本地目录和本地数据库。
+- Android 端只显示已同步到本地的歌曲和歌单，支持搜索、删除本地缓存和离线播放。
 
 原中文路径触发 Windows 构建乱码问题后，项目已复制到纯英文路径：
 
@@ -112,10 +115,10 @@ flutter doctor -v
 
 下一步继续完成：
 
-1. Phase 6：Android 端扫码连接 Windows 端。
-2. Phase 6：Android 端展示 Windows 端歌单并选择整个歌单同步。
-3. Phase 6：Android 端下载音频到 APP 本地目录并写入本地数据库。
-4. Phase 6：Android 端展示已同步内容、搜索并离线播放。
+1. Phase 7：用真实 MP3、FLAC、M4A、WAV 验收导入、同步和离线播放。
+2. Phase 7：用数字文件名、乱码文件名、重复文件和同步中断场景验收。
+3. Phase 7：修复验收中发现的问题。
+4. Phase 7：整理 Windows 运行目录和 Android APK release 交付文件。
 
 ## 当前验证结果
 

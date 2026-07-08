@@ -1,30 +1,25 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
+import 'package:android_app/android_library.dart';
+import 'package:android_app/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:android_app/main.dart';
+import 'package:music_database/music_database.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('shows Android sync and local library screen', (tester) async {
+    final database = MusicDatabase.memory();
+    addTearDown(database.close);
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    await tester.pumpWidget(
+      AndroidMusicApp(
+        database: database,
+        library: const AndroidMusicLibraryLocation(rootPath: 'test_library'),
+      ),
+    );
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('壹加音乐 - Android 随身库'), findsOneWidget);
+    expect(find.text('同步音乐'), findsOneWidget);
+    expect(find.text('连接电脑端'), findsOneWidget);
+    expect(find.byIcon(Icons.search), findsOneWidget);
+    expect(find.text('暂无已同步歌单'), findsOneWidget);
   });
 }

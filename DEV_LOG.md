@@ -119,3 +119,37 @@
 
 - Phase 5 的 Windows 服务骨架已完成，但尚未用 Android 端扫码联调。
 - 目前二维码已生成并显示，Android 端解析和下载流程留到 Phase 6 继续。
+
+### Phase 6：Android 端同步和本地播放
+
+已完成：
+
+- Android 端从计数器模板改为“壹加音乐 - Android 随身库”界面。
+- Android 端支持粘贴并解析 Windows 端二维码载荷。
+- Android 端支持连接 Windows 端同步服务，并获取电脑端歌单列表。
+- Android 端支持选择整张歌单同步。
+- 同步时会下载歌曲到 Android APP 本地 `audio` 目录。
+- 同步完成后会写入 Android 本地 SQLite 数据库，包括歌曲、歌单、歌单条目和同步缓存状态。
+- Android 端只显示 `sync_cache` 中状态为 `synced` 的本地内容。
+- Android 端支持搜索已同步歌曲和歌单。
+- Android 端支持删除本地缓存，并把本地同步状态标记为 deleted；该操作不调用电脑端修改接口，不影响电脑端主库。
+- Android 端支持离线播放已同步到本地的音频文件，并支持暂停、继续和停止。
+- Android Manifest 已声明网络权限，并允许同一 Wi-Fi 下访问 Windows 端明文 HTTP 同步服务。
+
+验证：
+
+- `apps\android_app`：`flutter analyze` 通过。
+- `apps\android_app`：`flutter test` 通过。
+- `packages\database`：`flutter analyze` 通过。
+- `packages\database`：`flutter test` 通过。
+- `apps\android_app`：`flutter build apk --debug` 通过，产物为 `apps\android_app\build\app\outputs\flutter-apk\app-debug.apk`。
+
+构建说明：
+
+- 第一次 Android 构建时，`sqlite3` native assets 需要下载预编译 SQLite 库，Dart 构建钩子遇到 TLS 握手失败。
+- 按构建日志建议，用 PowerShell `Invoke-WebRequest` 成功访问同一 GitHub SQLite 库地址后，重新构建通过。
+
+当前限制：
+
+- 当前 Android 端已支持“解析二维码载荷”，尚未接入摄像头实时扫码 UI。
+- 尚未做真机端到端验收：Windows 开启同步模式、Android 连接、同步真实歌曲并断网播放。

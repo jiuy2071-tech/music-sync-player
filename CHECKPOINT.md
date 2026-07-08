@@ -19,7 +19,7 @@ D:\Projects\music_sync_player
 
 ## 当前阶段
 
-下一步从 Phase 6 继续：Android 端同步和本地播放。
+下一步从 Phase 7 继续：验收、修复和 release 交付。
 
 ## 常用验证命令
 
