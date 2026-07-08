@@ -19,7 +19,18 @@ D:\Projects\music_sync_player
 
 ## 当前阶段
 
-下一步从 Phase 7 继续：验收、修复和 release 交付。
+下一步从 Phase 7 继续：真机验收和 release 交付整理。
+
+已完成 Phase 7 自动验收：
+- 已在 `manual_test_audio/` 生成非敏感 MP3、FLAC、M4A、WAV 测试音频。
+- Windows 端导入、文件夹导入、命名规则、重复文件、播放探测、同步服务测试通过。
+- Android 端同步客户端测试通过。
+- Windows exe 和 Android debug APK 均可构建。
+
+仍需人工确认：
+- Windows 文件选择器和文件夹选择器真实点击流程。
+- Android 真机连接 Windows 同步服务。
+- Android 真机断网或关闭同步模式后的离线播放。
 
 ## 常用验证命令
 

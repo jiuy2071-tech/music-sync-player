@@ -48,7 +48,7 @@ Thumbs.db
 # Local music library data
 library/
 audio/
+manual_test_audio/
 *.db
 *.sqlite
 *.sqlite3
-

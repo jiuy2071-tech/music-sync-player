@@ -153,3 +153,34 @@
 
 - 当前 Android 端已支持“解析二维码载荷”，尚未接入摄像头实时扫码 UI。
 - 尚未做真机端到端验收：Windows 开启同步模式、Android 连接、同步真实歌曲并断网播放。
+
+### Phase 7：验收、修复和 release 交付
+
+已完成：
+
+- 创建 `testing_notes.md`，列出 Phase 7 真实音频样本需求和手动验收清单。
+- 将 `manual_test_audio/` 加入 `.gitignore`，避免后续手动验收样本被误提交。
+- 新增 Android 同步客户端测试，覆盖连接本地测试服务、获取歌单、整张歌单同步、下载音频、写入本地数据库和 synced-only 可见性。
+- 确认 `ffmpeg` 和 `ffplay` 可用。
+- 在 `manual_test_audio/` 内生成 3 秒非敏感测试音频：MP3、FLAC、M4A、WAV 和重复 MP3。
+- 新增 Windows 生成音频导入测试，覆盖文件导入、文件夹导入、四种格式、正常命名、待整理命名和重复文件处理。
+- Phase 7 发现 Windows 旧 MCI 播放后端无法稳定播放带空格文件名，且不支持 FLAC/M4A。
+- Windows 播放后端改为使用本机已有 `ffplay` 做本地播放，已通过生成 MP3、FLAC、M4A、WAV 播放探测。
+
+自动验证：
+
+- `apps\android_app`：`flutter analyze` 通过。
+- `apps\android_app`：`flutter test` 通过。
+- `apps\android_app`：`flutter build apk --debug` 通过，产物为 `apps\android_app\build\app\outputs\flutter-apk\app-debug.apk`。
+- `apps\windows_app`：`flutter analyze` 通过。
+- `apps\windows_app`：`flutter test` 通过。
+- `apps\windows_app`：`flutter build windows` 通过，产物为 `apps\windows_app\build\windows\x64\runner\Release\windows_app.exe`。
+- `packages\core`：`flutter analyze` 通过，`flutter test` 通过。
+- `packages\database`：`flutter test` 通过。
+- `packages\sync_protocol`：`flutter analyze` 通过，`flutter test` 通过。
+
+待手动验收：
+
+- 真实 Windows 文件选择器和文件夹选择器操作仍需手动点选确认。
+- Windows 和 Android 真机同 Wi-Fi 联调仍需手动确认。
+- Android 断网或关闭 Windows 同步模式后的离线播放仍需真机确认。

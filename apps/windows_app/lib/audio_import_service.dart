@@ -8,12 +8,13 @@ import 'package:music_database/music_database.dart';
 import 'package:path/path.dart' as p;
 
 class AudioImportService {
-  AudioImportService(this.database);
+  AudioImportService(this.database, {this.libraryOverride});
 
   final MusicDatabase database;
+  final MusicLibraryLocation? libraryOverride;
 
   Future<ImportResult> importFiles(List<String> paths) async {
-    final library = await MusicLibraryLocation.resolve();
+    final library = libraryOverride ?? await MusicLibraryLocation.resolve();
     await library.ensureReady();
 
     final imported = <Song>[];
@@ -354,7 +355,7 @@ bool _isMeaninglessFileName(String value) {
   if (text.contains('�')) {
     return true;
   }
-  if (RegExp(r'^[a-fA-F0-9]{12,}$').hasMatch(text)) {
+  if (RegExp(r'^[a-fA-F0-9]{10,}$').hasMatch(text)) {
     return true;
   }
   if (RegExp(r'^[A-Za-z0-9_-]{18,}$').hasMatch(text) && !text.contains(' ')) {

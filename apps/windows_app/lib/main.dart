@@ -87,7 +87,7 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
   @override
   void dispose() {
     _syncServer.stop();
-    _player.stop();
+    _player.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -288,27 +288,27 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
     }
   }
 
-  void _pausePlayback() {
+  Future<void> _pausePlayback() async {
     try {
-      _player.pause();
+      await _player.pause();
       setState(() => _status = '已暂停：${_nowPlaying?.title ?? ''}');
     } catch (error) {
       setState(() => _status = '暂停失败：$error');
     }
   }
 
-  void _resumePlayback() {
+  Future<void> _resumePlayback() async {
     try {
-      _player.resume();
+      await _player.resume();
       setState(() => _status = '继续播放：${_nowPlaying?.title ?? ''}');
     } catch (error) {
       setState(() => _status = '继续播放失败：$error');
     }
   }
 
-  void _stopPlayback() {
+  Future<void> _stopPlayback() async {
     try {
-      _player.stop();
+      await _player.stop();
       setState(() {
         _nowPlaying = null;
         _status = '已停止播放';
@@ -430,9 +430,15 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
               nowPlaying: _nowPlaying?.title,
               onImportFiles: _importFiles,
               onImportFolder: _importFolder,
-              onPause: _pausePlayback,
-              onResume: _resumePlayback,
-              onStop: _stopPlayback,
+              onPause: () {
+                _pausePlayback();
+              },
+              onResume: () {
+                _resumePlayback();
+              },
+              onStop: () {
+                _stopPlayback();
+              },
             ),
             const SizedBox(height: 16),
             _SyncPanel(
