@@ -8,6 +8,9 @@ class AndroidAudioPlayer {
   Song? _currentSong;
 
   Song? get currentSong => _currentSong;
+  Stream<Duration> get positionStream => _player.onPositionChanged;
+  Stream<Duration> get durationStream => _player.onDurationChanged;
+  Stream<void> get completeStream => _player.onPlayerComplete;
 
   Future<void> play(Song song) async {
     await _player.stop();
@@ -18,6 +21,8 @@ class AndroidAudioPlayer {
   Future<void> pause() => _player.pause();
 
   Future<void> resume() => _player.resume();
+
+  Future<void> seek(Duration position) => _player.seek(position);
 
   Future<void> stop() async {
     await _player.stop();

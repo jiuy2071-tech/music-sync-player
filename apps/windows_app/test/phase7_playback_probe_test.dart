@@ -44,7 +44,11 @@ void main() {
 
       await player.play(song);
       await Future<void>.delayed(const Duration(milliseconds: 80));
-      player.stop();
+      await player.pause();
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      await player.resume();
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      await player.stop();
     }
   });
 }

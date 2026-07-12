@@ -203,3 +203,38 @@
 - `apps\android_app`：`flutter build apk --debug` 通过，产物为 `apps\android_app\build\app\outputs\flutter-apk\app-debug.apk`。
 - 第一次构建时 Gradle 下载 `mobile_scanner` 相关 Android/Kotlin 依赖遇到 TLS 握手失败；用 PowerShell 成功访问对应 Maven 地址后重试构建通过。
 - 当前环境无法真实打开手机摄像头，因此真机扫码仍需安装 APK 后人工确认。
+
+### Phase 8：最终交付整理
+
+已完成：
+
+- 重新构建 Windows 端。
+- 重新构建 Android debug APK。
+- 整理 Windows 完整可运行目录到 `release\windows\MusicSyncPlayer`。
+- 整理 Android debug APK 到 `release\android\music_sync_player_v1_debug.apk`。
+- 创建 `RELEASE_NOTES.md`，并复制一份到 `release\RELEASE_NOTES.md` 方便交付。
+- 更新 `README.md`，写清楚启动 Windows、安装 APK、Wi-Fi 同步、已完成功能和仍需人工确认事项。
+
+验证：
+
+- `apps\windows_app`：`flutter build windows` 通过。
+- `apps\android_app`：`flutter build apk --debug` 通过。
+
+交付产物：
+
+- Windows：`release\windows\MusicSyncPlayer\windows_app.exe`。
+- Android：`release\android\music_sync_player_v1_debug.apk`。
+
+说明：
+
+- `release/`、`build/`、APK、exe 等构建产物不提交到 Git。
+- Android 构建仍有 `mobile_scanner` 使用 Kotlin Gradle Plugin 的未来兼容警告，但当前 debug APK 构建成功。
+- 真机扫码、同 Wi-Fi 连接和断网离线播放仍需人工确认。
+
+### Phase 8：播放器体验整理
+
+- Windows 默认首页调整为播放器优先的“音乐库”：歌曲、歌单、搜索和底部播放条留在首页。
+- “添加歌曲”和“Wi-Fi 同步”改为左侧独立页面，导入和二维码不再占用默认播放页面。
+- Windows 底部播放条改为常见音乐软件样式：歌曲信息、单一播放/暂停按钮、停止按钮、播放时间和可拖动进度条。
+- Windows 拖动进度条后会以目标时间重新启动 `ffplay`，因此会有一次轻微重启，但不会从头播放。
+- Android 同步结果会显示实际本地歌曲数；如果某首歌曲失败，会显示首个失败原因，避免“看起来同步成功但列表为空”。

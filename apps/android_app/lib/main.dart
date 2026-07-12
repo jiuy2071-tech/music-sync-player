@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -70,14 +71,41 @@ class _AndroidHomePageState extends State<AndroidHomePage> {
   List<Song> _selectedPlaylistSongs = const [];
   Playlist? _selectedLocalPlaylist;
   Song? _nowPlaying;
+  Duration _playbackPosition = Duration.zero;
+  Duration _playbackDuration = Duration.zero;
   String _status = '准备就绪';
   bool _busy = false;
+  StreamSubscription<Duration>? _positionSubscription;
+  StreamSubscription<Duration>? _durationSubscription;
+  StreamSubscription<void>? _completeSubscription;
 
   @override
   void initState() {
     super.initState();
     _syncClient = AndroidSyncClient();
     _player = AndroidAudioPlayer();
+    _positionSubscription = _player.positionStream.listen((position) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _playbackPosition = position);
+    });
+    _durationSubscription = _player.durationStream.listen((duration) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _playbackDuration = duration);
+    });
+    _completeSubscription = _player.completeStream.listen((_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _nowPlaying = null;
+        _playbackPosition = Duration.zero;
+        _status = '播放结束';
+      });
+    });
     _reloadLocal();
   }
 
@@ -85,6 +113,9 @@ class _AndroidHomePageState extends State<AndroidHomePage> {
   void dispose() {
     _syncClient.dispose();
     _player.dispose();
+    _positionSubscription?.cancel();
+    _durationSubscription?.cancel();
+    _completeSubscription?.cancel();
     _payloadController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -202,9 +233,13 @@ class _AndroidHomePageState extends State<AndroidHomePage> {
         return;
       }
       _reloadLocal();
+      final firstFailure = result.failureMessages.isEmpty
+          ? ''
+          : '，首个失败：${result.failureMessages.first}';
       setState(() {
-        _status =
-            '同步完成：下载 ${result.downloadedCount}，跳过 ${result.skippedCount}，失败 ${result.failedCount}';
+        _status = result.hasFailures
+            ? '同步未完全成功：下载 ${result.downloadedCount}，跳过 ${result.skippedCount}，失败 ${result.failedCount}，本机现有 ${result.localSongCount} 首$firstFailure'
+            : '同步完成：下载 ${result.downloadedCount}，跳过 ${result.skippedCount}，本机现有 ${result.localSongCount} 首';
         _busy = false;
       });
     } catch (error) {
@@ -226,6 +261,10 @@ class _AndroidHomePageState extends State<AndroidHomePage> {
       }
       setState(() {
         _nowPlaying = song;
+        _playbackPosition = Duration.zero;
+        _playbackDuration = song.durationMs == null
+            ? Duration.zero
+            : Duration(milliseconds: song.durationMs!);
         _status = '正在播放：${song.title}';
       });
     } catch (error) {
@@ -256,10 +295,21 @@ class _AndroidHomePageState extends State<AndroidHomePage> {
       await _player.stop();
       setState(() {
         _nowPlaying = null;
+        _playbackPosition = Duration.zero;
+        _playbackDuration = Duration.zero;
         _status = '已停止播放';
       });
     } catch (error) {
       setState(() => _status = '停止失败：$error');
+    }
+  }
+
+  Future<void> _seekPlayback(Duration position) async {
+    try {
+      await _player.seek(position);
+      setState(() => _playbackPosition = position);
+    } catch (error) {
+      setState(() => _status = '拖动进度失败：$error');
     }
   }
 
@@ -310,9 +360,12 @@ class _AndroidHomePageState extends State<AndroidHomePage> {
               const SizedBox(height: 12),
               _PlaybackBar(
                 nowPlaying: _nowPlaying?.title,
+                position: _playbackPosition,
+                duration: _playbackDuration,
                 onPause: _nowPlaying == null ? null : _pausePlayback,
                 onResume: _nowPlaying == null ? null : _resumePlayback,
                 onStop: _nowPlaying == null ? null : _stopPlayback,
+                onSeek: _nowPlaying == null ? null : _seekPlayback,
               ),
               const SizedBox(height: 12),
               TextField(
@@ -538,42 +591,96 @@ class _RemotePlaylistPanel extends StatelessWidget {
 class _PlaybackBar extends StatelessWidget {
   const _PlaybackBar({
     required this.nowPlaying,
+    required this.position,
+    required this.duration,
     required this.onPause,
     required this.onResume,
     required this.onStop,
+    required this.onSeek,
   });
 
   final String? nowPlaying;
+  final Duration position;
+  final Duration duration;
   final VoidCallback? onPause;
   final VoidCallback? onResume;
   final VoidCallback? onStop;
+  final ValueChanged<Duration>? onSeek;
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        Text('当前播放：${nowPlaying ?? '无'}'),
-        IconButton(
-          tooltip: '暂停',
-          onPressed: onPause,
-          icon: const Icon(Icons.pause),
+    final maxMs = duration.inMilliseconds;
+    final currentMs = position.inMilliseconds.clamp(0, maxMs);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        border: Border.all(color: Theme.of(context).dividerColor),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              '当前播放：${nowPlaying ?? '无'}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Row(
+              children: [
+                Text(_formatDuration(position)),
+                Expanded(
+                  child: Slider(
+                    value: maxMs == 0 ? 0 : currentMs.toDouble(),
+                    max: maxMs == 0 ? 1 : maxMs.toDouble(),
+                    onChanged: onSeek == null || maxMs == 0
+                        ? null
+                        : (value) {
+                            onSeek!(Duration(milliseconds: value.round()));
+                          },
+                  ),
+                ),
+                Text(maxMs == 0 ? '--:--' : _formatDuration(duration)),
+              ],
+            ),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                IconButton(
+                  tooltip: '暂停',
+                  onPressed: onPause,
+                  icon: const Icon(Icons.pause),
+                ),
+                IconButton(
+                  tooltip: '继续',
+                  onPressed: onResume,
+                  icon: const Icon(Icons.play_arrow),
+                ),
+                IconButton(
+                  tooltip: '停止',
+                  onPressed: onStop,
+                  icon: const Icon(Icons.stop),
+                ),
+              ],
+            ),
+          ],
         ),
-        IconButton(
-          tooltip: '继续',
-          onPressed: onResume,
-          icon: const Icon(Icons.play_arrow),
-        ),
-        IconButton(
-          tooltip: '停止',
-          onPressed: onStop,
-          icon: const Icon(Icons.stop),
-        ),
-      ],
+      ),
     );
   }
+}
+
+String _formatDuration(Duration duration) {
+  final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+  final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+  final hours = duration.inHours;
+  if (hours > 0) {
+    return '$hours:$minutes:$seconds';
+  }
+  return '$minutes:$seconds';
 }
 
 class _LocalLibraryPanel extends StatelessWidget {

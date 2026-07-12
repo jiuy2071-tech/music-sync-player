@@ -73,7 +73,7 @@ void main() {
               'file_hash': hash,
               'original_file_name': 'song-a.mp3',
               'display_name_source': 'filename',
-              'is_pending_review': false,
+              'is_pending_review': 0,
               'sort_order': 0,
               'download_url':
                   'http://${payload.host}:${payload.port}/songs/song-1/file',
@@ -120,17 +120,21 @@ void main() {
     expect(result.downloadedCount, 1);
     expect(result.skippedCount, 0);
     expect(result.failedCount, 0);
+    expect(result.localSongCount, 1);
+    expect(result.failureMessages, isEmpty);
     expect(database.search.searchPlaylists('', syncedOnly: true), hasLength(1));
     expect(database.search.searchSongs('', syncedOnly: true), hasLength(1));
     expect(database.playlists.songsForPlaylist('playlist-1'), hasLength(1));
-    expect(await File('${library.audioPath}${Platform.pathSeparator}song-1.mp3').exists(), isTrue);
+    expect(
+      await File(
+        '${library.audioPath}${Platform.pathSeparator}song-1.mp3',
+      ).exists(),
+      isTrue,
+    );
   });
 }
 
-Future<void> _writeJson(
-  HttpRequest request,
-  Map<String, Object?> body,
-) async {
+Future<void> _writeJson(HttpRequest request, Map<String, Object?> body) async {
   request.response.headers.contentType = ContentType.json;
   request.response.write(jsonEncode(body));
   await request.response.close();

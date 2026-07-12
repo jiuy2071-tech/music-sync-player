@@ -1,7 +1,11 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:music_core/music_core.dart';
 import 'package:music_database/music_database.dart';
 import 'package:music_sync_protocol/music_sync_protocol.dart';
+import 'package:path/path.dart' as p;
 import 'package:qr_flutter/qr_flutter.dart';
 
 import 'audio_import_service.dart';
@@ -54,6 +58,8 @@ class WindowsHomePage extends StatefulWidget {
   State<WindowsHomePage> createState() => _WindowsHomePageState();
 }
 
+enum _WindowsPage { library, import, sync }
+
 class _WindowsHomePageState extends State<WindowsHomePage> {
   late final AudioImportService _importService;
   late final WindowsAudioPlayer _player;
@@ -68,12 +74,17 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
   Playlist? _selectedPlaylist;
   ImportResult? _lastImportResult;
   Song? _nowPlaying;
+  Duration _playbackPosition = Duration.zero;
+  Duration _playbackDuration = Duration.zero;
+  Timer? _progressTimer;
+  _WindowsPage _page = _WindowsPage.library;
   SyncSession? _syncSession;
   String? _syncPayloadText;
   String _status = '准备就绪';
   String _syncStatus = '同步模式未开启';
   bool _busy = false;
   bool _syncBusy = false;
+  bool _isPlaybackPaused = false;
 
   @override
   void initState() {
@@ -86,6 +97,7 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
 
   @override
   void dispose() {
+    _progressTimer?.cancel();
     _syncServer.stop();
     _player.dispose();
     _searchController.dispose();
@@ -273,16 +285,91 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
     _reloadAll();
   }
 
+  Future<void> _removeSongFromLibrary(Song song) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('移出全部歌曲'),
+        content: Text(
+          '确定把“${song.title}”从全部歌曲移除吗？\n'
+          '这只会删除本应用音乐库中的记录和复制音频，不会删除你最初导入的原始文件。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('移除'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) {
+      return;
+    }
+
+    try {
+      if (_nowPlaying?.id == song.id) {
+        await _player.stop();
+        _nowPlaying = null;
+      }
+      widget.database.songs.deleteById(song.id);
+      final deletedCopy = await _deleteLibraryCopy(song);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _status = deletedCopy
+            ? '已从全部歌曲移除：${song.title}。原始导入文件不会删除。'
+            : '已从全部歌曲移除：${song.title}。未删除音频文件，因为它不在本应用音乐库目录。';
+      });
+      _reloadAll();
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _status = '移除失败：$error');
+    }
+  }
+
+  Future<bool> _deleteLibraryCopy(Song song) async {
+    final file = File(song.localPath);
+    final audioRoot = p.normalize(
+      Directory(widget.library.audioPath).absolute.path,
+    );
+    final filePath = p.normalize(file.absolute.path);
+    final rootPrefix = audioRoot.endsWith(p.separator)
+        ? audioRoot
+        : '$audioRoot${p.separator}';
+    if (!filePath.toLowerCase().startsWith(rootPrefix.toLowerCase())) {
+      return false;
+    }
+    if (!await file.exists()) {
+      return false;
+    }
+    await file.delete();
+    return true;
+  }
+
   Future<void> _playSong(Song song) async {
     try {
       await _player.play(song);
+      final duration = song.durationMs == null
+          ? await _player.probeDuration(song)
+          : Duration(milliseconds: song.durationMs!);
       if (!mounted) {
         return;
       }
       setState(() {
         _nowPlaying = song;
+        _playbackPosition = Duration.zero;
+        _playbackDuration = duration ?? Duration.zero;
+        _isPlaybackPaused = false;
         _status = '正在播放：${song.title}';
       });
+      _startProgressTimer();
     } catch (error) {
       setState(() => _status = '播放失败：$error');
     }
@@ -291,7 +378,11 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
   Future<void> _pausePlayback() async {
     try {
       await _player.pause();
-      setState(() => _status = '已暂停：${_nowPlaying?.title ?? ''}');
+      _syncPlaybackPosition();
+      setState(() {
+        _isPlaybackPaused = true;
+        _status = '已暂停：${_nowPlaying?.title ?? ''}';
+      });
     } catch (error) {
       setState(() => _status = '暂停失败：$error');
     }
@@ -300,7 +391,11 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
   Future<void> _resumePlayback() async {
     try {
       await _player.resume();
-      setState(() => _status = '继续播放：${_nowPlaying?.title ?? ''}');
+      _startProgressTimer();
+      setState(() {
+        _isPlaybackPaused = false;
+        _status = '继续播放：${_nowPlaying?.title ?? ''}';
+      });
     } catch (error) {
       setState(() => _status = '继续播放失败：$error');
     }
@@ -309,13 +404,59 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
   Future<void> _stopPlayback() async {
     try {
       await _player.stop();
+      _progressTimer?.cancel();
       setState(() {
         _nowPlaying = null;
+        _playbackPosition = Duration.zero;
+        _playbackDuration = Duration.zero;
+        _isPlaybackPaused = false;
         _status = '已停止播放';
       });
     } catch (error) {
       setState(() => _status = '停止失败：$error');
     }
+  }
+
+  Future<void> _seekPlayback(Duration position) async {
+    try {
+      await _player.seek(position);
+      if (!mounted) {
+        return;
+      }
+      setState(() => _playbackPosition = position);
+      _startProgressTimer();
+    } catch (error) {
+      setState(() => _status = '拖动进度失败：$error');
+    }
+  }
+
+  Future<void> _togglePlayback() {
+    return _isPlaybackPaused ? _resumePlayback() : _pausePlayback();
+  }
+
+  void _startProgressTimer() {
+    _progressTimer?.cancel();
+    _progressTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+      if (!mounted || _nowPlaying == null) {
+        return;
+      }
+      _syncPlaybackPosition();
+    });
+  }
+
+  void _syncPlaybackPosition() {
+    final position = _player.position;
+    if (_playbackDuration > Duration.zero && position >= _playbackDuration) {
+      _progressTimer?.cancel();
+      setState(() {
+        _nowPlaying = null;
+        _playbackPosition = _playbackDuration;
+        _isPlaybackPaused = false;
+        _status = '播放结束';
+      });
+      return;
+    }
+    setState(() => _playbackPosition = position);
   }
 
   Future<void> _startSyncMode() async {
@@ -400,7 +541,8 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
               child: const Text('取消'),
             ),
             FilledButton(
-              onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+              onPressed: () =>
+                  Navigator.of(context).pop(controller.text.trim()),
               child: const Text('确定'),
             ),
           ],
@@ -417,31 +559,200 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('壹加音乐 - Windows 主库')),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _Toolbar(
-              busy: _busy,
-              libraryPath: widget.library.rootPath,
-              status: _status,
-              nowPlaying: _nowPlaying?.title,
-              onImportFiles: _importFiles,
-              onImportFolder: _importFolder,
-              onPause: () {
-                _pausePlayback();
-              },
-              onResume: () {
-                _resumePlayback();
-              },
-              onStop: () {
-                _stopPlayback();
-              },
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: _PlayerBar(
+            song: _nowPlaying,
+            status: _status,
+            position: _playbackPosition,
+            duration: _playbackDuration,
+            isPaused: _isPlaybackPaused,
+            onTogglePlayback: _nowPlaying == null ? null : _togglePlayback,
+            onStop: _stopPlayback,
+            onSeek: _nowPlaying == null ? null : _seekPlayback,
+          ),
+        ),
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final extended = constraints.maxWidth >= 1050;
+          return Row(
+            children: [
+              NavigationRail(
+                extended: extended,
+                minExtendedWidth: 188,
+                selectedIndex: _page.index,
+                onDestinationSelected: (index) {
+                  setState(() => _page = _WindowsPage.values[index]);
+                },
+                leading: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: extended
+                      ? const Text('壹加音乐', style: TextStyle(fontSize: 20))
+                      : const Icon(Icons.graphic_eq),
+                ),
+                destinations: const [
+                  NavigationRailDestination(
+                    icon: Icon(Icons.library_music_outlined),
+                    selectedIcon: Icon(Icons.library_music),
+                    label: Text('音乐库'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.add_circle_outline),
+                    selectedIcon: Icon(Icons.add_circle),
+                    label: Text('添加歌曲'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.wifi_tethering_outlined),
+                    selectedIcon: Icon(Icons.wifi_tethering),
+                    label: Text('Wi-Fi 同步'),
+                  ),
+                ],
+              ),
+              const VerticalDivider(width: 1),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: _buildPage(),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildPage() {
+    return switch (_page) {
+      _WindowsPage.library => _buildLibraryPage(),
+      _WindowsPage.import => _buildImportPage(),
+      _WindowsPage.sync => _buildSyncPage(),
+    };
+  }
+
+  Widget _buildLibraryPage() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _PageHeader(
+          title: '音乐库',
+          subtitle: '${_songs.length} 首歌曲 · ${_playlists.length} 个歌单',
+          actions: [
+            FilledButton.icon(
+              onPressed: () => setState(() => _page = _WindowsPage.import),
+              icon: const Icon(Icons.add),
+              label: const Text('添加歌曲'),
             ),
-            const SizedBox(height: 16),
-            _SyncPanel(
+            IconButton(
+              tooltip: 'Wi-Fi 同步',
+              onPressed: () => setState(() => _page = _WindowsPage.sync),
+              icon: const Icon(Icons.wifi_tethering),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _SearchField(
+          controller: _searchController,
+          onChanged: (_) => _reloadAll(),
+        ),
+        const SizedBox(height: 16),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final songList = _SongList(
+                title: '全部歌曲',
+                songs: _songs,
+                trailingBuilder: (song) => Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: '加入当前歌单',
+                      icon: const Icon(Icons.playlist_add),
+                      onPressed: () => _addSongToPlaylist(song),
+                    ),
+                    IconButton(
+                      tooltip: '从全部歌曲移除',
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => _removeSongFromLibrary(song),
+                    ),
+                  ],
+                ),
+                onPlay: _playSong,
+              );
+              final playlists = _PlaylistPanel(
+                playlists: _playlists,
+                selected: _selectedPlaylist,
+                selectedSongs: _playlistSongs,
+                onSelect: (playlist) {
+                  _selectedPlaylist = playlist;
+                  _reloadAll();
+                },
+                onCreate: _createPlaylist,
+                onRename: _renamePlaylist,
+                onDelete: _deletePlaylist,
+                onRemoveSong: _removeSongFromPlaylist,
+                onPlaySong: _playSong,
+              );
+              if (constraints.maxWidth < 820) {
+                return Column(
+                  children: [
+                    Expanded(flex: 3, child: songList),
+                    const SizedBox(height: 16),
+                    Expanded(flex: 2, child: playlists),
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(flex: 3, child: songList),
+                  const SizedBox(width: 16),
+                  Expanded(flex: 2, child: playlists),
+                ],
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildImportPage() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _PageHeader(title: '添加歌曲', subtitle: '导入后会复制到本应用音乐库，不会移动原始文件'),
+        const SizedBox(height: 20),
+        _Toolbar(
+          busy: _busy,
+          libraryPath: widget.library.rootPath,
+          onImportFiles: _importFiles,
+          onImportFolder: _importFolder,
+        ),
+        const SizedBox(height: 16),
+        _ImportSummary(result: _lastImportResult),
+        const SizedBox(height: 16),
+        Expanded(
+          child: _SongList(
+            title: '待整理音频',
+            songs: _pendingSongs,
+            onPlay: _playSong,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSyncPage() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _PageHeader(title: 'Wi-Fi 同步', subtitle: '让手机扫描二维码后同步整张歌单'),
+        const SizedBox(height: 20),
+        Expanded(
+          child: SingleChildScrollView(
+            child: _SyncPanel(
               busy: _syncBusy,
               status: _syncStatus,
               session: _syncSession,
@@ -449,63 +760,43 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
               onStart: _startSyncMode,
               onStop: _stopSyncMode,
             ),
-            const SizedBox(height: 16),
-            _SearchField(
-              controller: _searchController,
-              onChanged: (_) => _reloadAll(),
-            ),
-            const SizedBox(height: 16),
-            _ImportSummary(result: _lastImportResult),
-            const SizedBox(height: 16),
-            Expanded(
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: _SongList(
-                      title: '全部歌曲',
-                      songs: _songs,
-                      trailingBuilder: (song) => IconButton(
-                        tooltip: '加入当前歌单',
-                        icon: const Icon(Icons.playlist_add),
-                        onPressed: () => _addSongToPlaylist(song),
-                      ),
-                      onPlay: _playSong,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    flex: 2,
-                    child: _PlaylistPanel(
-                      playlists: _playlists,
-                      selected: _selectedPlaylist,
-                      selectedSongs: _playlistSongs,
-                      onSelect: (playlist) {
-                        _selectedPlaylist = playlist;
-                        _reloadAll();
-                      },
-                      onCreate: _createPlaylist,
-                      onRename: _renamePlaylist,
-                      onDelete: _deletePlaylist,
-                      onRemoveSong: _removeSongFromPlaylist,
-                      onPlaySong: _playSong,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    flex: 2,
-                    child: _SongList(
-                      title: '待整理音频',
-                      songs: _pendingSongs,
-                      onPlay: _playSong,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
-      ),
+      ],
+    );
+  }
+}
+
+class _PageHeader extends StatelessWidget {
+  const _PageHeader({
+    required this.title,
+    required this.subtitle,
+    this.actions = const [],
+  });
+
+  final String title;
+  final String subtitle;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: Theme.of(context).textTheme.headlineSmall),
+              const SizedBox(height: 4),
+              Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
+            ],
+          ),
+        ),
+        if (actions.isNotEmpty) ...[
+          const SizedBox(width: 16),
+          Wrap(spacing: 8, runSpacing: 8, children: actions),
+        ],
+      ],
     );
   }
 }
@@ -514,24 +805,14 @@ class _Toolbar extends StatelessWidget {
   const _Toolbar({
     required this.busy,
     required this.libraryPath,
-    required this.status,
-    required this.nowPlaying,
     required this.onImportFiles,
     required this.onImportFolder,
-    required this.onPause,
-    required this.onResume,
-    required this.onStop,
   });
 
   final bool busy;
   final String libraryPath;
-  final String status;
-  final String? nowPlaying;
   final VoidCallback onImportFiles;
   final VoidCallback onImportFolder;
-  final VoidCallback onPause;
-  final VoidCallback onResume;
-  final VoidCallback onStop;
 
   @override
   Widget build(BuildContext context) {
@@ -560,21 +841,6 @@ class _Toolbar extends StatelessWidget {
                   icon: const Icon(Icons.folder_open),
                   label: const Text('导入文件夹'),
                 ),
-                OutlinedButton.icon(
-                  onPressed: nowPlaying == null ? null : onPause,
-                  icon: const Icon(Icons.pause),
-                  label: const Text('暂停'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: nowPlaying == null ? null : onResume,
-                  icon: const Icon(Icons.play_arrow),
-                  label: const Text('继续'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: nowPlaying == null ? null : onStop,
-                  icon: const Icon(Icons.stop),
-                  label: const Text('停止'),
-                ),
                 if (busy)
                   const SizedBox(
                     width: 24,
@@ -585,15 +851,155 @@ class _Toolbar extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text('音乐库目录：$libraryPath'),
-            const SizedBox(height: 6),
-            Text('当前播放：${nowPlaying ?? '无'}'),
-            const SizedBox(height: 6),
-            Text(status, style: Theme.of(context).textTheme.bodyMedium),
           ],
         ),
       ),
     );
   }
+}
+
+class _PlayerBar extends StatefulWidget {
+  const _PlayerBar({
+    required this.song,
+    required this.status,
+    required this.position,
+    required this.duration,
+    required this.isPaused,
+    required this.onTogglePlayback,
+    required this.onStop,
+    required this.onSeek,
+  });
+
+  final Song? song;
+  final String status;
+  final Duration position;
+  final Duration duration;
+  final bool isPaused;
+  final VoidCallback? onTogglePlayback;
+  final VoidCallback onStop;
+  final ValueChanged<Duration>? onSeek;
+
+  @override
+  State<_PlayerBar> createState() => _PlayerBarState();
+}
+
+class _PlayerBarState extends State<_PlayerBar> {
+  double? _dragValue;
+
+  @override
+  void didUpdateWidget(covariant _PlayerBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.song?.id != widget.song?.id) {
+      _dragValue = null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final song = widget.song;
+    final enabled = song != null;
+    final maxMs = widget.duration.inMilliseconds;
+    final currentMs =
+        _dragValue ?? widget.position.inMilliseconds.clamp(0, maxMs).toDouble();
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainer,
+        border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  song == null ? Icons.music_note_outlined : Icons.music_note,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        song?.title ?? '选择一首歌曲开始播放',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        song == null
+                            ? widget.status
+                            : '${song.artist} · ${song.album}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: widget.isPaused ? '继续播放' : '暂停播放',
+                  iconSize: 34,
+                  onPressed: widget.onTogglePlayback,
+                  icon: Icon(
+                    widget.isPaused
+                        ? Icons.play_circle_filled
+                        : Icons.pause_circle_filled,
+                  ),
+                ),
+                IconButton(
+                  tooltip: '停止播放',
+                  onPressed: enabled ? widget.onStop : null,
+                  icon: const Icon(Icons.stop_circle_outlined),
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                Text(
+                  _formatDuration(Duration(milliseconds: currentMs.round())),
+                ),
+                Expanded(
+                  child: Slider(
+                    value: maxMs == 0 ? 0 : currentMs.toDouble(),
+                    max: maxMs == 0 ? 1 : maxMs.toDouble(),
+                    onChanged: widget.onSeek == null || maxMs == 0
+                        ? null
+                        : (value) {
+                            setState(() => _dragValue = value);
+                          },
+                    onChangeEnd: widget.onSeek == null || maxMs == 0
+                        ? null
+                        : (value) {
+                            setState(() => _dragValue = null);
+                            widget.onSeek!(
+                              Duration(milliseconds: value.round()),
+                            );
+                          },
+                  ),
+                ),
+                Text(maxMs == 0 ? '--:--' : _formatDuration(widget.duration)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _formatDuration(Duration duration) {
+  final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+  final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+  final hours = duration.inHours;
+  if (hours > 0) {
+    return '$hours:$minutes:$seconds';
+  }
+  return '$minutes:$seconds';
 }
 
 class _SyncPanel extends StatelessWidget {
@@ -933,15 +1339,19 @@ class _SongList extends StatelessWidget {
                         leading: IconButton(
                           tooltip: '播放',
                           icon: const Icon(Icons.play_arrow),
-                          onPressed: onPlay == null ? null : () => onPlay!(song),
+                          onPressed: onPlay == null
+                              ? null
+                              : () => onPlay!(song),
                         ),
-                        trailing: trailingBuilder?.call(song) ??
+                        trailing:
+                            trailingBuilder?.call(song) ??
                             (song.isPendingReview
                                 ? const Chip(label: Text('待整理'))
                                 : null),
                       );
                     },
-                    separatorBuilder: (context, index) => const Divider(height: 1),
+                    separatorBuilder: (context, index) =>
+                        const Divider(height: 1),
                     itemCount: songs.length,
                   ),
           ),

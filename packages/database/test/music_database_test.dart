@@ -68,6 +68,39 @@ void main() {
     expect(songs.single.id, song.id);
   });
 
+  test('removing song removes playlist and synced references', () {
+    final song = _song(id: 'song-1', title: 'Song A');
+    final playlist = _playlist(id: 'playlist-1', name: 'Daily');
+
+    database.songs.upsert(song);
+    database.playlists.upsert(playlist);
+    database.playlists.addSong(
+      item: _playlistItem(
+        id: 'item-1',
+        playlistId: playlist.id,
+        songId: song.id,
+      ),
+    );
+    database.sync.upsertCacheEntry(
+      SyncCacheEntry(
+        id: 'cache-1',
+        songId: song.id,
+        playlistId: playlist.id,
+        localCachePath: song.localPath,
+        fileHash: song.fileHash,
+        status: SyncCacheStatus.synced,
+        syncedAt: DateTime.utc(2026, 7, 8),
+      ),
+    );
+
+    database.songs.deleteById(song.id);
+
+    expect(database.songs.findById(song.id), isNull);
+    expect(database.playlists.songsForPlaylist(playlist.id), isEmpty);
+    expect(database.search.searchSongs('Song'), isEmpty);
+    expect(database.search.searchSongs('Song', syncedOnly: true), isEmpty);
+  });
+
   test('synced search only returns local synced content', () {
     final localSong = _song(id: 'song-1', title: 'Local Song');
     final remoteSong = _song(id: 'song-2', title: 'Remote Song');

@@ -9,7 +9,7 @@ V1 只做同一 Wi-Fi 下扫码同步，不做云同步、远程在线播放、U
 
 ## 当前状态
 
-当前完成到 Phase 7 自动验收：
+当前完成到 Phase 8 交付整理：
 
 - 已整理项目文档。
 - 已创建 monorepo 基础目录。
@@ -29,9 +29,11 @@ V1 只做同一 Wi-Fi 下扫码同步，不做云同步、远程在线播放、U
 - Windows 端已支持手动开启 Wi-Fi 同步模式，生成连接码和二维码。
 - Windows 端已提供连接验证、歌单列表、同步清单和音频下载接口。
 - Android 端已支持解析二维码载荷、连接 Windows 端并显示电脑端歌单。
+- Android 端已支持扫码连接 Windows 端，并保留手动粘贴二维码载荷的备用方式。
 - Android 端已支持按整张歌单同步到 APP 本地目录和本地数据库。
 - Android 端只显示已同步到本地的歌曲和歌单，支持搜索、删除本地缓存和离线播放。
 - Phase 7 已在 `manual_test_audio/` 内生成非敏感测试音频，该目录不会提交到 Git。
+- Phase 8 已重新构建 Windows 运行目录和 Android debug APK，并整理到 `release/`。
 
 原中文路径触发 Windows 构建乱码问题后，项目已复制到纯英文路径：
 
@@ -113,14 +115,74 @@ Windows 构建工具用来把 Windows 端 APP 打包成可以双击启动的 exe
 flutter doctor -v
 ```
 
-## 后续目标
+## 交付产物
 
-下一步继续完成：
+Windows 端完整运行目录：
 
-1. Phase 7：在真实 Windows UI 中点选文件和文件夹确认导入流程。
-2. Phase 7：用 Android 真机连接 Windows 同步服务，确认同 Wi-Fi 同步。
-3. Phase 7：关闭 Windows 同步模式或断开 Wi-Fi 后，确认 Android 已同步歌曲可离线播放。
-4. Phase 7：整理 Windows 运行目录和 Android APK release 交付文件。
+```text
+D:\Projects\music_sync_player\release\windows\MusicSyncPlayer\
+```
+
+Windows 启动文件：
+
+```text
+D:\Projects\music_sync_player\release\windows\MusicSyncPlayer\windows_app.exe
+```
+
+Android debug APK：
+
+```text
+D:\Projects\music_sync_player\release\android\music_sync_player_v1_debug.apk
+```
+
+`release/` 是交付输出目录，不提交到 Git。
+
+## 使用方法
+
+### 启动 Windows 端
+
+1. 打开：
+
+   ```text
+   D:\Projects\music_sync_player\release\windows\MusicSyncPlayer\
+   ```
+
+2. 双击 `windows_app.exe`。
+3. 默认进入“音乐库”，可直接搜索、播放歌曲和管理歌单。
+4. 需要导入时，点击左侧“添加歌曲”，再选择导入音频文件或导入文件夹。
+5. 需要同步时，点击左侧“Wi-Fi 同步”，开启同步模式并查看二维码和连接码。
+
+播放界面说明：底部固定播放条会显示歌曲、歌手、播放时间和进度条。点击中间按钮可播放或暂停；拖动进度条后，Windows 端会从目标位置继续播放。
+
+说明：当前 Windows 本地播放使用本机已有的 `ffplay`，用于支持 MP3、FLAC、M4A、WAV。若目标机器没有 `ffplay`，导入、歌单和同步仍可用，但 Windows 本地播放需要后续补充播放器环境或更换内置播放方案。
+
+### 安装 Android APK
+
+1. 将下面 APK 复制到 Android 手机：
+
+   ```text
+   D:\Projects\music_sync_player\release\android\music_sync_player_v1_debug.apk
+   ```
+
+2. 在手机上允许安装本地 APK。
+3. 安装后打开“壹加音乐”。
+
+### Wi-Fi 同步
+
+1. 确认 Windows 电脑和 Android 手机在同一 Wi-Fi。
+2. Windows 端开启同步模式。
+3. Android 端点击“扫码”，扫描 Windows 端二维码。
+4. 如果扫码失败，可以复制 Windows 端二维码载荷，在 Android 端粘贴后点击“连接电脑端”。
+5. Android 显示电脑端歌单后，选择整张歌单同步。
+6. 同步完成后，Android 端只显示已同步到本地的歌曲和歌单。
+7. 关闭 Windows 同步模式或断开网络后，Android 已同步歌曲应可离线播放。
+
+## 仍需人工确认
+
+- Windows 真实文件选择器和文件夹选择器点击流程。
+- Android 真机扫码权限弹窗和扫码识别。
+- Android 真机同 Wi-Fi 连接 Windows 同步服务。
+- Android 真机断网或关闭 Windows 同步模式后的离线播放。
 
 ## 当前验证结果
 
@@ -138,6 +200,12 @@ flutter build windows
 D:\Projects\music_sync_player\apps\windows_app\build\windows\x64\runner\Release\windows_app.exe
 ```
 
+交付目录：
+
+```text
+D:\Projects\music_sync_player\release\windows\MusicSyncPlayer\
+```
+
 Android 端：
 
 ```powershell
@@ -150,4 +218,10 @@ flutter build apk --debug
 
 ```text
 D:\Projects\music_sync_player\apps\android_app\build\app\outputs\flutter-apk\app-debug.apk
+```
+
+交付 APK：
+
+```text
+D:\Projects\music_sync_player\release\android\music_sync_player_v1_debug.apk
 ```

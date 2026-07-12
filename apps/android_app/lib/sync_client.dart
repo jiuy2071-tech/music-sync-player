@@ -37,11 +37,17 @@ class PlaylistSyncResult {
     required this.downloadedCount,
     required this.skippedCount,
     required this.failedCount,
+    required this.localSongCount,
+    required this.failureMessages,
   });
 
   final int downloadedCount;
   final int skippedCount;
   final int failedCount;
+  final int localSongCount;
+  final List<String> failureMessages;
+
+  bool get hasFailures => failedCount > 0;
 }
 
 class AndroidSyncClient {
@@ -101,13 +107,17 @@ class AndroidSyncClient {
     var downloaded = 0;
     var skipped = 0;
     var failed = 0;
+    final failureMessages = <String>[];
 
     for (final songJson in songs) {
       try {
         final songId = songJson['id']! as String;
         final format = AudioFormat.fromStorage(songJson['format']! as String);
         final expectedHash = songJson['file_hash']! as String;
-        final targetPath = p.join(library.audioPath, '$songId.${format.extension}');
+        final targetPath = p.join(
+          library.audioPath,
+          '$songId.${format.extension}',
+        );
         final existingCache = database.sync.findCacheForSong(songId);
         final targetFile = File(targetPath);
 
@@ -143,7 +153,7 @@ class AndroidSyncClient {
           displayNameSource: DisplayNameSource.fromStorage(
             songJson['display_name_source']! as String,
           ),
-          isPendingReview: songJson['is_pending_review']! as bool,
+          isPendingReview: _readBool(songJson['is_pending_review']),
           createdAt: now,
           updatedAt: now,
         );
@@ -168,8 +178,11 @@ class AndroidSyncClient {
             syncedAt: now,
           ),
         );
-      } catch (_) {
+      } catch (error) {
         failed++;
+        final title =
+            songJson['title']?.toString() ?? songJson['id'].toString();
+        failureMessages.add('$title：$error');
       }
     }
 
@@ -177,6 +190,8 @@ class AndroidSyncClient {
       downloadedCount: downloaded,
       skippedCount: skipped,
       failedCount: failed,
+      localSongCount: database.search.searchSongs('', syncedOnly: true).length,
+      failureMessages: failureMessages,
     );
   }
 
@@ -239,6 +254,19 @@ class AndroidSyncClient {
       rethrow;
     }
   }
+}
+
+bool _readBool(Object? value) {
+  if (value is bool) {
+    return value;
+  }
+  if (value is int) {
+    return value != 0;
+  }
+  if (value is String) {
+    return value == '1' || value.toLowerCase() == 'true';
+  }
+  return false;
 }
 
 Future<String> _fileHash(File file) async {
