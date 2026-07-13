@@ -69,3 +69,9 @@ dart analyze
 cd D:\Projects\music_sync_player\packages\database
 dart analyze
 ```
+
+## 最新完成项
+
+- Windows 播放器体验已补齐并已提交前验证：统一字体层级、居中的上一首/播放/下一首、播放队列、播放模式和快捷键。
+- 最新 Windows 运行包已重新构建并同步到：`D:\Projects\music_sync_player\release\windows\MusicSyncPlayer\windows_app.exe`。
+- 本轮只修改 Windows 端，因此没有重复构建 Android APK。

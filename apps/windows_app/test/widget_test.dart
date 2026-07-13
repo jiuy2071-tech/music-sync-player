@@ -19,6 +19,9 @@ void main() {
     );
 
     expect(find.byIcon(Icons.graphic_eq), findsOneWidget);
+    expect(find.byIcon(Icons.skip_previous_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.skip_next_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.queue_music_outlined), findsOneWidget);
     expect(find.text('音乐库'), findsAtLeastNWidgets(1));
     expect(find.text('选择一首歌曲开始播放'), findsOneWidget);
     final addSongsButton = find.widgetWithText(FilledButton, '添加歌曲');

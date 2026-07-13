@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:music_core/music_core.dart';
 import 'package:music_database/music_database.dart';
 import 'package:music_sync_protocol/music_sync_protocol.dart';
@@ -32,11 +34,50 @@ class WindowsMusicApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const textTheme = TextTheme(
+      headlineSmall: TextStyle(
+        fontSize: 22,
+        fontWeight: FontWeight.w600,
+        height: 1.25,
+      ),
+      titleLarge: TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.w600,
+        height: 1.3,
+      ),
+      titleMedium: TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w500,
+        height: 1.35,
+      ),
+      bodyLarge: TextStyle(
+        fontSize: 15,
+        fontWeight: FontWeight.w400,
+        height: 1.45,
+      ),
+      bodyMedium: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w400,
+        height: 1.4,
+      ),
+      bodySmall: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w400,
+        height: 1.35,
+      ),
+      labelLarge: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+        height: 1.2,
+      ),
+    );
     return MaterialApp(
       title: '壹加音乐',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1F7A68)),
+        fontFamily: 'Microsoft YaHei UI',
+        textTheme: textTheme,
         useMaterial3: true,
       ),
       home: WindowsHomePage(database: database, library: library),
@@ -60,12 +101,24 @@ class WindowsHomePage extends StatefulWidget {
 
 enum _WindowsPage { library, import, sync }
 
+enum _PlaybackMode { sequence, repeatAll, repeatOne, shuffle }
+
+enum _LibrarySongAction {
+  playNext,
+  addToQueue,
+  addToPlaylist,
+  removeFromLibrary,
+}
+
+enum _PlaylistSongAction { playNext, addToQueue, removeFromPlaylist }
+
 class _WindowsHomePageState extends State<WindowsHomePage> {
   late final AudioImportService _importService;
   late final WindowsAudioPlayer _player;
   late final WindowsSyncServer _syncServer;
   final _dialog = WindowsFileDialog();
   final _searchController = TextEditingController();
+  final _random = Random();
 
   List<Song> _songs = const [];
   List<Song> _pendingSongs = const [];
@@ -77,6 +130,10 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
   Duration _playbackPosition = Duration.zero;
   Duration _playbackDuration = Duration.zero;
   Timer? _progressTimer;
+  StreamSubscription<void>? _completionSubscription;
+  List<Song> _queue = const [];
+  int _queueIndex = -1;
+  _PlaybackMode _playbackMode = _PlaybackMode.sequence;
   _WindowsPage _page = _WindowsPage.library;
   SyncSession? _syncSession;
   String? _syncPayloadText;
@@ -92,12 +149,18 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
     _importService = AudioImportService(widget.database);
     _player = WindowsAudioPlayer();
     _syncServer = WindowsSyncServer(widget.database);
+    _completionSubscription = _player.completionStream.listen((_) {
+      if (mounted) {
+        _handlePlaybackCompleted();
+      }
+    });
     _reloadAll();
   }
 
   @override
   void dispose() {
     _progressTimer?.cancel();
+    _completionSubscription?.cancel();
     _syncServer.stop();
     _player.dispose();
     _searchController.dispose();
@@ -353,7 +416,23 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
     return true;
   }
 
-  Future<void> _playSong(Song song) async {
+  Future<void> _playSong(Song song, {List<Song>? context}) async {
+    final source = List<Song>.from(context ?? _songs);
+    if (source.isEmpty) {
+      source.add(song);
+    }
+    final index = source.indexWhere((item) => item.id == song.id);
+    if (index < 0) {
+      source.insert(0, song);
+    }
+    setState(() {
+      _queue = source;
+      _queueIndex = index < 0 ? 0 : index;
+    });
+    await _startPlayback(song);
+  }
+
+  Future<void> _startPlayback(Song song) async {
     try {
       await _player.play(song);
       final duration = song.durationMs == null
@@ -417,6 +496,144 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
     }
   }
 
+  Future<void> _playQueueIndex(int index) async {
+    if (index < 0 || index >= _queue.length) {
+      return;
+    }
+    setState(() => _queueIndex = index);
+    await _startPlayback(_queue[index]);
+  }
+
+  Future<void> _previousTrack() async {
+    if (_nowPlaying == null) {
+      return;
+    }
+    if (_playbackPosition >= const Duration(seconds: 5)) {
+      await _seekPlayback(Duration.zero);
+      return;
+    }
+    if (_queue.isEmpty) {
+      await _seekPlayback(Duration.zero);
+      return;
+    }
+    var previousIndex = _queueIndex - 1;
+    if (previousIndex < 0 && _playbackMode == _PlaybackMode.repeatAll) {
+      previousIndex = _queue.length - 1;
+    }
+    if (previousIndex < 0) {
+      await _seekPlayback(Duration.zero);
+      return;
+    }
+    await _playQueueIndex(previousIndex);
+  }
+
+  Future<void> _nextTrack({bool automatic = false}) async {
+    if (_queue.isEmpty || _queueIndex < 0) {
+      return;
+    }
+    if (automatic && _playbackMode == _PlaybackMode.repeatOne) {
+      await _playQueueIndex(_queueIndex);
+      return;
+    }
+
+    int? nextIndex;
+    if (_playbackMode == _PlaybackMode.shuffle && _queue.length > 1) {
+      final candidates = List<int>.generate(_queue.length, (index) => index)
+        ..remove(_queueIndex);
+      nextIndex = candidates[_random.nextInt(candidates.length)];
+    } else if (_queueIndex + 1 < _queue.length) {
+      nextIndex = _queueIndex + 1;
+    } else if (_playbackMode == _PlaybackMode.repeatAll) {
+      nextIndex = 0;
+    }
+
+    if (nextIndex == null) {
+      if (automatic) {
+        _progressTimer?.cancel();
+        setState(() {
+          _nowPlaying = null;
+          _playbackPosition = Duration.zero;
+          _playbackDuration = Duration.zero;
+          _isPlaybackPaused = false;
+          _status = '播放列表已结束';
+        });
+      } else {
+        setState(() => _status = '已经是最后一首');
+      }
+      return;
+    }
+    await _playQueueIndex(nextIndex);
+  }
+
+  void _handlePlaybackCompleted() {
+    _progressTimer?.cancel();
+    unawaited(_nextTrack(automatic: true));
+  }
+
+  void _enqueue(Song song, {required bool playNext}) {
+    if (_nowPlaying == null) {
+      unawaited(_playSong(song, context: [song]));
+      return;
+    }
+    if (_queue.any((item) => item.id == song.id)) {
+      setState(() => _status = '“${song.title}”已在播放队列中');
+      return;
+    }
+    final updated = List<Song>.from(_queue);
+    final insertAt = playNext ? _queueIndex + 1 : updated.length;
+    updated.insert(insertAt.clamp(0, updated.length), song);
+    setState(() {
+      _queue = updated;
+      _status = playNext ? '已设为下一首：${song.title}' : '已加入播放队列：${song.title}';
+    });
+  }
+
+  void _removeFromQueue(int index) {
+    if (index < 0 || index >= _queue.length) {
+      return;
+    }
+    if (index == _queueIndex) {
+      setState(() => _status = '当前正在播放，不能从队列移除');
+      return;
+    }
+    final updated = List<Song>.from(_queue)..removeAt(index);
+    setState(() {
+      _queue = updated;
+      if (index < _queueIndex) {
+        _queueIndex--;
+      }
+    });
+  }
+
+  void _reorderQueue(int oldIndex, int newIndex) {
+    final updated = List<Song>.from(_queue);
+    final song = updated.removeAt(oldIndex);
+    updated.insert(newIndex, song);
+    final currentId = _nowPlaying?.id;
+    setState(() {
+      _queue = updated;
+      _queueIndex = currentId == null
+          ? -1
+          : updated.indexWhere((item) => item.id == currentId);
+    });
+  }
+
+  void _clearUpcomingQueue() {
+    final current = _nowPlaying;
+    setState(() {
+      _queue = current == null ? const [] : [current];
+      _queueIndex = current == null ? -1 : 0;
+      _status = '已清空待播放队列';
+    });
+  }
+
+  void _setPlaybackMode(_PlaybackMode mode) {
+    setState(() {
+      _playbackMode = mode;
+      _status = '播放模式：${_playbackModeLabel(mode)}';
+    });
+  }
+
   Future<void> _seekPlayback(Duration position) async {
     try {
       await _player.seek(position);
@@ -434,6 +651,19 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
     return _isPlaybackPaused ? _resumePlayback() : _pausePlayback();
   }
 
+  Future<void> _seekRelative(Duration offset) {
+    final maximum = _playbackDuration > Duration.zero
+        ? _playbackDuration
+        : Duration(days: 1);
+    var target = _playbackPosition + offset;
+    if (target < Duration.zero) {
+      target = Duration.zero;
+    } else if (target > maximum) {
+      target = maximum;
+    }
+    return _seekPlayback(target);
+  }
+
   void _startProgressTimer() {
     _progressTimer?.cancel();
     _progressTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
@@ -447,16 +677,38 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
   void _syncPlaybackPosition() {
     final position = _player.position;
     if (_playbackDuration > Duration.zero && position >= _playbackDuration) {
-      _progressTimer?.cancel();
-      setState(() {
-        _nowPlaying = null;
-        _playbackPosition = _playbackDuration;
-        _isPlaybackPaused = false;
-        _status = '播放结束';
-      });
+      setState(() => _playbackPosition = _playbackDuration);
       return;
     }
     setState(() => _playbackPosition = position);
+  }
+
+  Future<void> _openQueue() async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => _QueueDialog(
+          queue: _queue,
+          currentIndex: _queueIndex,
+          onPlayAt: (index) {
+            Navigator.of(context).pop();
+            unawaited(_playQueueIndex(index));
+          },
+          onRemoveAt: (index) {
+            _removeFromQueue(index);
+            setDialogState(() {});
+          },
+          onReorder: (oldIndex, newIndex) {
+            _reorderQueue(oldIndex, newIndex);
+            setDialogState(() {});
+          },
+          onClearUpcoming: () {
+            _clearUpcomingQueue();
+            setDialogState(() {});
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _startSyncMode() async {
@@ -558,68 +810,109 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: _PlayerBar(
-            song: _nowPlaying,
-            status: _status,
-            position: _playbackPosition,
-            duration: _playbackDuration,
-            isPaused: _isPlaybackPaused,
-            onTogglePlayback: _nowPlaying == null ? null : _togglePlayback,
-            onStop: _stopPlayback,
-            onSeek: _nowPlaying == null ? null : _seekPlayback,
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.space, control: true): () {
+          if (_nowPlaying != null) {
+            unawaited(_togglePlayback());
+          }
+        },
+        const SingleActivator(LogicalKeyboardKey.arrowLeft, control: true): () {
+          if (_nowPlaying != null) {
+            unawaited(_previousTrack());
+          }
+        },
+        const SingleActivator(
+          LogicalKeyboardKey.arrowRight,
+          control: true,
+        ): () {
+          if (_nowPlaying != null) {
+            unawaited(_nextTrack());
+          }
+        },
+        const SingleActivator(LogicalKeyboardKey.arrowLeft, alt: true): () {
+          if (_nowPlaying != null) {
+            unawaited(_seekRelative(const Duration(seconds: -5)));
+          }
+        },
+        const SingleActivator(LogicalKeyboardKey.arrowRight, alt: true): () {
+          if (_nowPlaying != null) {
+            unawaited(_seekRelative(const Duration(seconds: 5)));
+          }
+        },
+      },
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
+          bottomNavigationBar: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: _PlayerBar(
+                song: _nowPlaying,
+                status: _status,
+                position: _playbackPosition,
+                duration: _playbackDuration,
+                isPaused: _isPlaybackPaused,
+                onTogglePlayback: _nowPlaying == null ? null : _togglePlayback,
+                onPrevious: _nowPlaying == null ? null : _previousTrack,
+                onNext: _nowPlaying == null ? null : _nextTrack,
+                onStop: _stopPlayback,
+                onSeek: _nowPlaying == null ? null : _seekPlayback,
+                playbackMode: _playbackMode,
+                onSelectPlaybackMode: _setPlaybackMode,
+                queueLength: _queue.length,
+                onOpenQueue: _openQueue,
+              ),
+            ),
           ),
-        ),
-      ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final extended = constraints.maxWidth >= 1050;
-          return Row(
-            children: [
-              NavigationRail(
-                extended: extended,
-                minExtendedWidth: 188,
-                selectedIndex: _page.index,
-                onDestinationSelected: (index) {
-                  setState(() => _page = _WindowsPage.values[index]);
-                },
-                leading: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: extended
-                      ? const Text('壹加音乐', style: TextStyle(fontSize: 20))
-                      : const Icon(Icons.graphic_eq),
-                ),
-                destinations: const [
-                  NavigationRailDestination(
-                    icon: Icon(Icons.library_music_outlined),
-                    selectedIcon: Icon(Icons.library_music),
-                    label: Text('音乐库'),
+          body: LayoutBuilder(
+            builder: (context, constraints) {
+              final extended = constraints.maxWidth >= 1050;
+              return Row(
+                children: [
+                  NavigationRail(
+                    extended: extended,
+                    minExtendedWidth: 188,
+                    selectedIndex: _page.index,
+                    onDestinationSelected: (index) {
+                      setState(() => _page = _WindowsPage.values[index]);
+                    },
+                    leading: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: extended
+                          ? const Text('壹加音乐', style: TextStyle(fontSize: 20))
+                          : const Icon(Icons.graphic_eq),
+                    ),
+                    destinations: const [
+                      NavigationRailDestination(
+                        icon: Icon(Icons.library_music_outlined),
+                        selectedIcon: Icon(Icons.library_music),
+                        label: Text('音乐库'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.add_circle_outline),
+                        selectedIcon: Icon(Icons.add_circle),
+                        label: Text('添加歌曲'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.wifi_tethering_outlined),
+                        selectedIcon: Icon(Icons.wifi_tethering),
+                        label: Text('Wi-Fi 同步'),
+                      ),
+                    ],
                   ),
-                  NavigationRailDestination(
-                    icon: Icon(Icons.add_circle_outline),
-                    selectedIcon: Icon(Icons.add_circle),
-                    label: Text('添加歌曲'),
-                  ),
-                  NavigationRailDestination(
-                    icon: Icon(Icons.wifi_tethering_outlined),
-                    selectedIcon: Icon(Icons.wifi_tethering),
-                    label: Text('Wi-Fi 同步'),
+                  const VerticalDivider(width: 1),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: _buildPage(),
+                    ),
                   ),
                 ],
-              ),
-              const VerticalDivider(width: 1),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: _buildPage(),
-                ),
-              ),
-            ],
-          );
-        },
+              );
+            },
+          ),
+        ),
       ),
     );
   }
@@ -664,22 +957,46 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
               final songList = _SongList(
                 title: '全部歌曲',
                 songs: _songs,
-                trailingBuilder: (song) => Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      tooltip: '加入当前歌单',
-                      icon: const Icon(Icons.playlist_add),
-                      onPressed: () => _addSongToPlaylist(song),
+                nowPlayingId: _nowPlaying?.id,
+                trailingBuilder: (song) => PopupMenuButton<_LibrarySongAction>(
+                  tooltip: '更多操作',
+                  onSelected: (action) {
+                    switch (action) {
+                      case _LibrarySongAction.playNext:
+                        _enqueue(song, playNext: true);
+                        break;
+                      case _LibrarySongAction.addToQueue:
+                        _enqueue(song, playNext: false);
+                        break;
+                      case _LibrarySongAction.addToPlaylist:
+                        _addSongToPlaylist(song);
+                        break;
+                      case _LibrarySongAction.removeFromLibrary:
+                        unawaited(_removeSongFromLibrary(song));
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(
+                      value: _LibrarySongAction.playNext,
+                      child: Text('播放下一首'),
                     ),
-                    IconButton(
-                      tooltip: '从全部歌曲移除',
-                      icon: const Icon(Icons.delete_outline),
-                      onPressed: () => _removeSongFromLibrary(song),
+                    PopupMenuItem(
+                      value: _LibrarySongAction.addToQueue,
+                      child: Text('加入播放队列'),
+                    ),
+                    PopupMenuItem(
+                      value: _LibrarySongAction.addToPlaylist,
+                      child: Text('加入当前歌单'),
+                    ),
+                    PopupMenuDivider(),
+                    PopupMenuItem(
+                      value: _LibrarySongAction.removeFromLibrary,
+                      child: Text('从全部歌曲移除'),
                     ),
                   ],
                 ),
-                onPlay: _playSong,
+                onPlay: (song) => _playSong(song, context: _songs),
               );
               final playlists = _PlaylistPanel(
                 playlists: _playlists,
@@ -693,7 +1010,10 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
                 onRename: _renamePlaylist,
                 onDelete: _deletePlaylist,
                 onRemoveSong: _removeSongFromPlaylist,
-                onPlaySong: _playSong,
+                onPlaySong: (song) => _playSong(song, context: _playlistSongs),
+                onPlayNext: (song) => _enqueue(song, playNext: true),
+                onAddToQueue: (song) => _enqueue(song, playNext: false),
+                nowPlayingId: _nowPlaying?.id,
               );
               if (constraints.maxWidth < 820) {
                 return Column(
@@ -737,7 +1057,8 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
           child: _SongList(
             title: '待整理音频',
             songs: _pendingSongs,
-            onPlay: _playSong,
+            nowPlayingId: _nowPlaying?.id,
+            onPlay: (song) => _playSong(song, context: _pendingSongs),
           ),
         ),
       ],
@@ -866,8 +1187,14 @@ class _PlayerBar extends StatefulWidget {
     required this.duration,
     required this.isPaused,
     required this.onTogglePlayback,
+    required this.onPrevious,
+    required this.onNext,
     required this.onStop,
     required this.onSeek,
+    required this.playbackMode,
+    required this.onSelectPlaybackMode,
+    required this.queueLength,
+    required this.onOpenQueue,
   });
 
   final Song? song;
@@ -876,8 +1203,14 @@ class _PlayerBar extends StatefulWidget {
   final Duration duration;
   final bool isPaused;
   final VoidCallback? onTogglePlayback;
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
   final VoidCallback onStop;
   final ValueChanged<Duration>? onSeek;
+  final _PlaybackMode playbackMode;
+  final ValueChanged<_PlaybackMode> onSelectPlaybackMode;
+  final int queueLength;
+  final VoidCallback onOpenQueue;
 
   @override
   State<_PlayerBar> createState() => _PlayerBarState();
@@ -913,48 +1246,112 @@ class _PlayerBarState extends State<_PlayerBar> {
           children: [
             Row(
               children: [
-                Icon(
-                  song == null ? Icons.music_note_outlined : Icons.music_note,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(width: 12),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        song?.title ?? '选择一首歌曲开始播放',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        song == null
-                            ? widget.status
-                            : '${song.artist} · ${song.album}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          song == null
+                              ? Icons.music_note_outlined
+                              : Icons.music_note,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 10),
+                        Flexible(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                song?.title ?? '选择一首歌曲开始播放',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                song == null
+                                    ? widget.status
+                                    : '${song.artist} · ${song.album}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                IconButton(
-                  tooltip: widget.isPaused ? '继续播放' : '暂停播放',
-                  iconSize: 34,
-                  onPressed: widget.onTogglePlayback,
-                  icon: Icon(
-                    widget.isPaused
-                        ? Icons.play_circle_filled
-                        : Icons.pause_circle_filled,
+                Expanded(
+                  child: Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          tooltip: '上一首',
+                          onPressed: widget.onPrevious,
+                          icon: const Icon(Icons.skip_previous_rounded),
+                        ),
+                        IconButton(
+                          tooltip: widget.isPaused ? '继续播放' : '暂停播放',
+                          iconSize: 42,
+                          onPressed: widget.onTogglePlayback,
+                          icon: Icon(
+                            widget.isPaused
+                                ? Icons.play_circle_filled
+                                : Icons.pause_circle_filled,
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: '下一首',
+                          onPressed: widget.onNext,
+                          icon: const Icon(Icons.skip_next_rounded),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                IconButton(
-                  tooltip: '停止播放',
-                  onPressed: enabled ? widget.onStop : null,
-                  icon: const Icon(Icons.stop_circle_outlined),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        PopupMenuButton<_PlaybackMode>(
+                          tooltip:
+                              '播放模式：${_playbackModeLabel(widget.playbackMode)}',
+                          icon: Icon(_playbackModeIcon(widget.playbackMode)),
+                          onSelected: widget.onSelectPlaybackMode,
+                          itemBuilder: (context) => [
+                            for (final mode in _PlaybackMode.values)
+                              CheckedPopupMenuItem(
+                                value: mode,
+                                checked: mode == widget.playbackMode,
+                                child: Text(_playbackModeLabel(mode)),
+                              ),
+                          ],
+                        ),
+                        IconButton(
+                          tooltip: '播放队列（${widget.queueLength}）',
+                          onPressed: widget.onOpenQueue,
+                          icon: Badge(
+                            isLabelVisible: widget.queueLength > 0,
+                            label: Text('${widget.queueLength}'),
+                            child: const Icon(Icons.queue_music_outlined),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: '停止播放',
+                          onPressed: enabled ? widget.onStop : null,
+                          icon: const Icon(Icons.stop_circle_outlined),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -1000,6 +1397,94 @@ String _formatDuration(Duration duration) {
     return '$hours:$minutes:$seconds';
   }
   return '$minutes:$seconds';
+}
+
+String _playbackModeLabel(_PlaybackMode mode) {
+  return switch (mode) {
+    _PlaybackMode.sequence => '顺序播放',
+    _PlaybackMode.repeatAll => '列表循环',
+    _PlaybackMode.repeatOne => '单曲循环',
+    _PlaybackMode.shuffle => '随机播放',
+  };
+}
+
+IconData _playbackModeIcon(_PlaybackMode mode) {
+  return switch (mode) {
+    _PlaybackMode.sequence => Icons.format_list_numbered,
+    _PlaybackMode.repeatAll => Icons.repeat,
+    _PlaybackMode.repeatOne => Icons.repeat_one,
+    _PlaybackMode.shuffle => Icons.shuffle,
+  };
+}
+
+class _QueueDialog extends StatelessWidget {
+  const _QueueDialog({
+    required this.queue,
+    required this.currentIndex,
+    required this.onPlayAt,
+    required this.onRemoveAt,
+    required this.onReorder,
+    required this.onClearUpcoming,
+  });
+
+  final List<Song> queue;
+  final int currentIndex;
+  final ValueChanged<int> onPlayAt;
+  final ValueChanged<int> onRemoveAt;
+  final void Function(int oldIndex, int newIndex) onReorder;
+  final VoidCallback onClearUpcoming;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Row(
+        children: [
+          const Icon(Icons.queue_music),
+          const SizedBox(width: 8),
+          Text('播放队列（${queue.length}）'),
+        ],
+      ),
+      content: SizedBox(
+        width: 560,
+        height: 420,
+        child: queue.isEmpty
+            ? const Center(child: Text('播放队列为空'))
+            : ReorderableListView.builder(
+                itemCount: queue.length,
+                onReorderItem: onReorder,
+                itemBuilder: (context, index) {
+                  final song = queue[index];
+                  final isCurrent = index == currentIndex;
+                  return ListTile(
+                    key: ValueKey(song.id),
+                    selected: isCurrent,
+                    leading: Icon(
+                      isCurrent ? Icons.equalizer : Icons.drag_handle,
+                    ),
+                    title: Text(song.title),
+                    subtitle: Text('${song.artist} · ${song.album}'),
+                    onTap: () => onPlayAt(index),
+                    trailing: IconButton(
+                      tooltip: isCurrent ? '当前正在播放' : '从队列移除',
+                      onPressed: isCurrent ? null : () => onRemoveAt(index),
+                      icon: const Icon(Icons.close),
+                    ),
+                  );
+                },
+              ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: queue.length > 1 ? onClearUpcoming : null,
+          child: const Text('清空待播放'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('完成'),
+        ),
+      ],
+    );
+  }
 }
 
 class _SyncPanel extends StatelessWidget {
@@ -1158,6 +1643,9 @@ class _PlaylistPanel extends StatelessWidget {
     required this.onDelete,
     required this.onRemoveSong,
     required this.onPlaySong,
+    required this.onPlayNext,
+    required this.onAddToQueue,
+    required this.nowPlayingId,
   });
 
   final List<Playlist> playlists;
@@ -1169,6 +1657,9 @@ class _PlaylistPanel extends StatelessWidget {
   final VoidCallback onDelete;
   final ValueChanged<Song> onRemoveSong;
   final ValueChanged<Song> onPlaySong;
+  final ValueChanged<Song> onPlayNext;
+  final ValueChanged<Song> onAddToQueue;
+  final String? nowPlayingId;
 
   @override
   Widget build(BuildContext context) {
@@ -1264,19 +1755,54 @@ class _PlaylistPanel extends StatelessWidget {
                     : ListView.separated(
                         itemBuilder: (context, index) {
                           final song = selectedSongs[index];
-                          return ListTile(
-                            dense: true,
-                            title: Text(song.title),
-                            subtitle: Text(song.artist),
-                            leading: IconButton(
-                              tooltip: '播放',
-                              icon: const Icon(Icons.play_arrow),
-                              onPressed: () => onPlaySong(song),
-                            ),
-                            trailing: IconButton(
-                              tooltip: '从歌单移除',
-                              icon: const Icon(Icons.remove_circle_outline),
-                              onPressed: () => onRemoveSong(song),
+                          return GestureDetector(
+                            onDoubleTap: () => onPlaySong(song),
+                            child: ListTile(
+                              dense: true,
+                              selected: song.id == nowPlayingId,
+                              title: Text(song.title),
+                              subtitle: Text(song.artist),
+                              leading: IconButton(
+                                tooltip: '播放',
+                                icon: Icon(
+                                  song.id == nowPlayingId
+                                      ? Icons.equalizer
+                                      : Icons.play_arrow,
+                                ),
+                                onPressed: () => onPlaySong(song),
+                              ),
+                              trailing: PopupMenuButton<_PlaylistSongAction>(
+                                tooltip: '更多操作',
+                                onSelected: (action) {
+                                  switch (action) {
+                                    case _PlaylistSongAction.playNext:
+                                      onPlayNext(song);
+                                      break;
+                                    case _PlaylistSongAction.addToQueue:
+                                      onAddToQueue(song);
+                                      break;
+                                    case _PlaylistSongAction.removeFromPlaylist:
+                                      onRemoveSong(song);
+                                      break;
+                                  }
+                                },
+                                itemBuilder: (context) => const [
+                                  PopupMenuItem(
+                                    value: _PlaylistSongAction.playNext,
+                                    child: Text('播放下一首'),
+                                  ),
+                                  PopupMenuItem(
+                                    value: _PlaylistSongAction.addToQueue,
+                                    child: Text('加入播放队列'),
+                                  ),
+                                  PopupMenuDivider(),
+                                  PopupMenuItem(
+                                    value:
+                                        _PlaylistSongAction.removeFromPlaylist,
+                                    child: Text('从歌单移除'),
+                                  ),
+                                ],
+                              ),
                             ),
                           );
                         },
@@ -1297,12 +1823,14 @@ class _SongList extends StatelessWidget {
   const _SongList({
     required this.title,
     required this.songs,
+    this.nowPlayingId,
     this.trailingBuilder,
     this.onPlay,
   });
 
   final String title;
   final List<Song> songs;
+  final String? nowPlayingId;
   final Widget Function(Song song)? trailingBuilder;
   final ValueChanged<Song>? onPlay;
 
@@ -1330,24 +1858,33 @@ class _SongList extends StatelessWidget {
                 : ListView.separated(
                     itemBuilder: (context, index) {
                       final song = songs[index];
-                      return ListTile(
-                        dense: true,
-                        title: Text(song.title),
-                        subtitle: Text(
-                          '${song.artist} · ${song.album} · ${song.format.extension.toUpperCase()}',
+                      final isPlaying = song.id == nowPlayingId;
+                      return GestureDetector(
+                        onDoubleTap: onPlay == null
+                            ? null
+                            : () => onPlay!(song),
+                        child: ListTile(
+                          dense: true,
+                          selected: isPlaying,
+                          title: Text(song.title),
+                          subtitle: Text(
+                            '${song.artist} · ${song.album} · ${song.format.extension.toUpperCase()}',
+                          ),
+                          leading: IconButton(
+                            tooltip: '播放',
+                            icon: Icon(
+                              isPlaying ? Icons.equalizer : Icons.play_arrow,
+                            ),
+                            onPressed: onPlay == null
+                                ? null
+                                : () => onPlay!(song),
+                          ),
+                          trailing:
+                              trailingBuilder?.call(song) ??
+                              (song.isPendingReview
+                                  ? const Chip(label: Text('待整理'))
+                                  : null),
                         ),
-                        leading: IconButton(
-                          tooltip: '播放',
-                          icon: const Icon(Icons.play_arrow),
-                          onPressed: onPlay == null
-                              ? null
-                              : () => onPlay!(song),
-                        ),
-                        trailing:
-                            trailingBuilder?.call(song) ??
-                            (song.isPendingReview
-                                ? const Chip(label: Text('待整理'))
-                                : null),
                       );
                     },
                     separatorBuilder: (context, index) =>

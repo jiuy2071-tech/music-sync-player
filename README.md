@@ -135,6 +135,15 @@ Android debug APK：
 D:\Projects\music_sync_player\release\android\music_sync_player_v1_debug.apk
 ```
 
+## 最新 Windows 播放器体验
+
+- Windows 界面统一使用 `Microsoft YaHei UI`，标题、正文和按钮采用固定字重层级，避免同一页面忽粗忽细。
+- 底部播放条采用三段布局：左侧显示当前歌曲，中间固定为“上一首 / 播放或暂停 / 下一首”，右侧提供播放模式、播放队列和停止。
+- 支持顺序播放、列表循环、单曲循环和随机播放；队列可以查看、拖动排序、点歌播放、移除待播歌曲和清空待播放内容。
+- 全部歌曲和歌单歌曲的更多菜单均可“播放下一首”或“加入播放队列”；双击歌曲也可以开始播放。
+- 键盘快捷键：`Ctrl + 空格` 播放/暂停，`Ctrl + 左/右` 上一首/下一首，`Alt + 左/右` 后退/前进 5 秒。
+- Windows 验证已通过：`flutter analyze`、`flutter test`、`flutter build windows`。最新可运行版本在 `release\\windows\\MusicSyncPlayer\\windows_app.exe`。
+
 `release/` 是交付输出目录，不提交到 Git。
 
 ## 使用方法

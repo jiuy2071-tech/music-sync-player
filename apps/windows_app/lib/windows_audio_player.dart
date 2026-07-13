@@ -12,8 +12,10 @@ class WindowsAudioPlayer {
   bool _paused = false;
   Duration _basePosition = Duration.zero;
   final Stopwatch _stopwatch = Stopwatch();
+  final _completionController = StreamController<void>.broadcast();
 
   Song? get currentSong => _currentSong;
+  Stream<void> get completionStream => _completionController.stream;
   Duration get position {
     if (_currentSong == null) {
       return Duration.zero;
@@ -44,7 +46,9 @@ class WindowsAudioPlayer {
         'quiet',
         song.localPath,
       ];
-      _process = await Process.start('ffplay', args);
+      final process = await Process.start('ffplay', args);
+      _process = process;
+      unawaited(_watchForCompletion(process));
     } on ProcessException catch (error) {
       throw AppError(
         'audio_player_unavailable',
@@ -153,7 +157,27 @@ class WindowsAudioPlayer {
     await _waitForExitOrKill(process);
   }
 
-  Future<void> dispose() => stop();
+  Future<void> dispose() async {
+    await stop();
+    await _completionController.close();
+  }
+
+  Future<void> _watchForCompletion(Process process) async {
+    await process.exitCode;
+    if (!identical(_process, process)) {
+      return;
+    }
+    _process = null;
+    _currentSong = null;
+    _paused = false;
+    _basePosition = Duration.zero;
+    _stopwatch
+      ..stop()
+      ..reset();
+    if (!_completionController.isClosed) {
+      _completionController.add(null);
+    }
+  }
 
   Future<void> _waitForExitOrKill(Process process) async {
     try {

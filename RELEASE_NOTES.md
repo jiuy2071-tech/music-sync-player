@@ -106,6 +106,15 @@ Note: Windows local playback currently uses `ffplay` from the local machine to s
 - Windows sync service tests.
 - Android sync client tests.
 
+## Latest Windows Player Improvements
+
+- Unified the Windows typography with Microsoft YaHei UI and a consistent title/body/button weight scale.
+- Moved previous, play/pause, and next controls to the center of the bottom player bar.
+- Added playback queue controls: play next, add to queue, inspect the queue, drag to reorder, remove upcoming songs, and clear upcoming songs.
+- Added sequence, repeat-all, repeat-one, and shuffle playback modes.
+- Added keyboard controls: Ctrl+Space, Ctrl+Left/Right, and Alt+Left/Right.
+- Verified this Windows update with `flutter analyze`, `flutter test`, and `flutter build windows`.
+
 ## Still Needs Manual Confirmation
 
 - Windows real file picker and folder picker interaction.
