@@ -137,6 +137,13 @@ Note: Windows local playback currently uses `ffplay` from the local machine to s
 - Performed a clean Windows rebuild and inspected the generated EXE icon directly to confirm it contains the approved green music mark.
 - Renamed the delivered Windows entry point to `YijiaMusic.exe` so Explorer treats it as the branded application rather than reusing the old `windows_app.exe` icon cache.
 
+## Android Player And Sync Refresh
+
+- Rebuilt the Android app around Library, Playlists, and Sync Music bottom navigation, keeping only synced songs and playlists in the local views.
+- After a successful playlist sync, the app clears any active search, refreshes the local database views, selects the synced playlist, and returns to the Library tab with the actual local-song count.
+- Added a compact player and a full player panel with play or pause, previous, next, and seek controls. Local-cache deletion now asks for confirmation and leaves the Windows library untouched.
+- Updated the Android app label and launcher icons to the Yijia Music brand. Verified with Android `flutter analyze`, `flutter test`, and `flutter build apk --debug`.
+
 ## Still Needs Manual Confirmation
 
 - Windows real file picker and folder picker interaction.

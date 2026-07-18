@@ -100,3 +100,10 @@ dart analyze
 - 已执行一次 Windows 干净构建，并从刚生成的 EXE 提取图标确认是绿色折面音乐标志。
 - 完整交付目录会在本次提交前重新同步；Android 本轮无改动。
 - Windows 交付入口改为 `release\\windows\\MusicSyncPlayer\\YijiaMusic.exe`，不再让用户启动默认工程名 `windows_app.exe`。
+
+## 2026-07-18 Android 播放器与同步体验更新
+
+- Android 已改为音乐库、歌单、同步音乐三页导航；同步成功后自动刷新本地库并跳回音乐库，刚同步的歌单会被选中。
+- Android 已具备迷你播放器和完整播放面板，支持暂停、播放、上一首、下一首、进度拖动和仅删除手机本地缓存。
+- Android 应用名称和启动图标已改为壹加音乐品牌；最新 debug APK 已同步到 `D:\Projects\music_sync_player\release\android\music_sync_player_v1_debug.apk`。
+- 已通过 Android `flutter analyze`、`flutter test` 和 `flutter build apk --debug`；真机扫码、同 Wi-Fi 连接和离线播放仍需人工确认。

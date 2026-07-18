@@ -11,6 +11,8 @@ class AndroidAudioPlayer {
   Stream<Duration> get positionStream => _player.onPositionChanged;
   Stream<Duration> get durationStream => _player.onDurationChanged;
   Stream<void> get completeStream => _player.onPlayerComplete;
+  Stream<bool> get playingStream =>
+      _player.onPlayerStateChanged.map((state) => state == PlayerState.playing);
 
   Future<void> play(Song song) async {
     await _player.stop();

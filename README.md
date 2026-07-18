@@ -251,3 +251,11 @@ D:\Projects\music_sync_player\release\android\music_sync_player_v1_debug.apk
 - Windows 安装包使用正式文件名 `YijiaMusic.exe`，已内嵌同一枚图标；新的文件名也能避免资源管理器继续沿用旧工程名的图标缓存。
 - 原生 Windows 窗口标题使用稳定的 Unicode 写法显示为“壹加音乐”，避免因电脑的系统编码不同而出现乱码。
 - 品牌图源在 `apps/windows_app/assets/branding/yijia_music_logo.png`；它是工程资源，不是构建产物。
+
+## Android 更新
+
+- Android 首页调整为手机音乐软件常见的底部导航：`音乐库`、`歌单`、`同步音乐`。本地歌曲和歌单只显示已同步到手机的内容。
+- 同步成功后会清除搜索条件、自动回到音乐库并选中刚同步的歌单，状态会明确显示本机已有歌曲数，避免“同步成功但找不到歌曲”。
+- Android 已加入迷你播放器和完整播放面板，支持播放或暂停、上一首、下一首和拖动播放进度；删除缓存会先确认，且不会影响电脑端。
+- Android 应用名称和启动图标已更新为壹加音乐品牌。最新 debug APK：`D:\Projects\music_sync_player\release\android\music_sync_player_v1_debug.apk`。
+- 已自动验证 Android `flutter analyze`、`flutter test` 和 `flutter build apk --debug`。真机摄像头扫码、同 Wi-Fi 连接和实际离线播放仍需要安装 APK 后人工确认。

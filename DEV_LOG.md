@@ -280,3 +280,12 @@
 - 对 Windows 工程执行 `flutter clean` 后完整重建，确保新的 ICO 资源被重新编译进 EXE，而不是沿用旧的 Flutter 图标缓存。
 - 已从新生成的 `windows_app.exe` 直接提取图标核对，结果为确认后的绿色折面音乐标志。
 - 交付程序名称调整为 `YijiaMusic.exe`，移除默认工程名作为用户启动入口，并让 Windows 将它作为新的应用程序读取图标。
+
+### Phase 8：Android 本地播放器与同步体验更新
+
+- Android 页面改为 `音乐库`、`歌单`、`同步音乐` 三个底部导航入口，移除将所有功能堆在一个页面的旧布局。
+- 同步完成后会清除当前搜索、刷新本地数据库结果、选中刚同步的歌单并回到音乐库；状态明确显示手机当前歌曲数量与首个失败原因。
+- Android 播放器新增底部迷你播放器和完整播放面板，支持播放或暂停、上一首、下一首与拖动进度。
+- 删除本地缓存增加确认提示，并明确不影响 Windows 端；本地库仍只查询同步状态为 `synced` 的歌曲和歌单。
+- Android 加入壹加音乐品牌图、应用名称和启动图标。
+- 验证通过：`apps/android_app` 的 `flutter analyze`、`flutter test` 和 `flutter build apk --debug`；最新 APK 已同步到 `release\\android\\music_sync_player_v1_debug.apk`。
