@@ -247,3 +247,13 @@
 - 新增顺序播放、列表循环、单曲循环和随机播放；自然播放结束会按当前模式自动处理下一首。
 - 新增 Windows 键盘快捷键：`Ctrl + 空格` 播放/暂停、`Ctrl + 左/右` 上一首/下一首、`Alt + 左/右` 后退/前进 5 秒。
 - 验证通过：`apps/windows_app` 的 `flutter analyze`、`flutter test` 和 `flutter build windows`；完整运行目录已重新同步到 `release\\windows\\MusicSyncPlayer`。
+
+### Phase 8：Windows 深色视觉重设计
+
+- Windows 主题由默认 Material 亮色外观调整为深石墨层次：主背景、侧边导航、内容表面和悬停表面使用不同深浅的灰黑色。
+- 主强调色使用低饱和莓红 `#C95670`，同步等成功状态使用青柠绿 `#B9D267`；未引入蓝白、蓝紫、大面积纯色或装饰性渐变。
+- 统一 `Microsoft YaHei UI` 的字体层级，限制标题、正文和按钮字重，改善中文文字忽粗忽细的问题。
+- 导航、搜索框、歌曲列表、歌单、导入和同步页面统一为细边框、8px 圆角、无投影的低干扰布局。
+- 底部播放器改为全宽稳定控制台；播放队列改为贴右侧的展开面板样式。
+- 新增 Widget 测试，固定验证 Windows 使用深色主题与莓红主色。
+- 验证通过：`apps/windows_app` 的 `flutter analyze`、`flutter test`、`flutter build windows`；新版完整运行目录已同步到 `release\\windows\\MusicSyncPlayer`。

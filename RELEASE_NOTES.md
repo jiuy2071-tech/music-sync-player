@@ -115,6 +115,15 @@ Note: Windows local playback currently uses `ffplay` from the local machine to s
 - Added keyboard controls: Ctrl+Space, Ctrl+Left/Right, and Alt+Left/Right.
 - Verified this Windows update with `flutter analyze`, `flutter test`, and `flutter build windows`.
 
+## Windows Visual Refresh
+
+- Replaced the default bright Material appearance with a layered graphite interface using berry-red controls and lime success states.
+- Kept the listening view focused: import and Wi-Fi sync remain separate pages, while search, songs, playlists, and playback stay on the main library page.
+- Restyled navigation, search, lists, playlist panels, import, sync, and the full-width bottom player bar with restrained borders and spacing.
+- Updated the queue to appear as a right-aligned panel rather than a centered utility dialog.
+- Added a widget test that guards the dark theme and berry-red primary color.
+- Verified this visual refresh with `flutter analyze`, `flutter test`, and `flutter build windows`.
+
 ## Still Needs Manual Confirmation
 
 - Windows real file picker and folder picker interaction.

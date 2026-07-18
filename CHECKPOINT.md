@@ -75,3 +75,9 @@ dart analyze
 - Windows 播放器体验已补齐并已提交前验证：统一字体层级、居中的上一首/播放/下一首、播放队列、播放模式和快捷键。
 - 最新 Windows 运行包已重新构建并同步到：`D:\Projects\music_sync_player\release\windows\MusicSyncPlayer\windows_app.exe`。
 - 本轮只修改 Windows 端，因此没有重复构建 Android APK。
+
+## 2026-07-18 Windows 视觉更新
+
+- 已完成深石墨、莓红、青柠点缀的 Windows 界面重设计，并保留全部既有 V1 功能。
+- 已通过 Windows `flutter analyze`、`flutter test` 和 `flutter build windows`。
+- 新版运行包已同步到：`D:\Projects\music_sync_player\release\windows\MusicSyncPlayer\windows_app.exe`。

@@ -18,6 +18,10 @@ void main() {
       ),
     );
 
+    final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    expect(app.theme?.brightness, Brightness.dark);
+    expect(app.theme?.colorScheme.primary, const Color(0xFFC95670));
+
     expect(find.byIcon(Icons.graphic_eq), findsOneWidget);
     expect(find.byIcon(Icons.skip_previous_rounded), findsOneWidget);
     expect(find.byIcon(Icons.skip_next_rounded), findsOneWidget);

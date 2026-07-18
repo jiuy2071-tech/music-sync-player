@@ -14,6 +14,21 @@ import 'audio_import_service.dart';
 import 'sync_server.dart';
 import 'windows_audio_player.dart';
 
+class _AppColors {
+  const _AppColors._();
+
+  static const background = Color(0xFF17181A);
+  static const sidebar = Color(0xFF121315);
+  static const surface = Color(0xFF202225);
+  static const surfaceRaised = Color(0xFF292C30);
+  static const outline = Color(0xFF383B40);
+  static const primaryText = Color(0xFFF1F0EE);
+  static const secondaryText = Color(0xFFA8A5A2);
+  static const berry = Color(0xFFC95670);
+  static const berrySoft = Color(0xFF3A222B);
+  static const lime = Color(0xFFB9D267);
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final library = await MusicLibraryLocation.resolve();
@@ -71,13 +86,110 @@ class WindowsMusicApp extends StatelessWidget {
         height: 1.2,
       ),
     );
+    final colorScheme = const ColorScheme.dark(
+      primary: _AppColors.berry,
+      onPrimary: _AppColors.primaryText,
+      secondary: _AppColors.lime,
+      onSecondary: _AppColors.background,
+      surface: _AppColors.surface,
+      onSurface: _AppColors.primaryText,
+      error: Color(0xFFE77A7A),
+      onError: _AppColors.background,
+      outline: _AppColors.outline,
+    );
     return MaterialApp(
       title: '壹加音乐',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1F7A68)),
+        brightness: Brightness.dark,
+        colorScheme: colorScheme,
         fontFamily: 'Microsoft YaHei UI',
         textTheme: textTheme,
+        scaffoldBackgroundColor: _AppColors.background,
+        dividerColor: _AppColors.outline,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: _AppColors.background,
+          foregroundColor: _AppColors.primaryText,
+          elevation: 0,
+        ),
+        navigationRailTheme: const NavigationRailThemeData(
+          backgroundColor: _AppColors.sidebar,
+          indicatorColor: _AppColors.berrySoft,
+          selectedIconTheme: IconThemeData(color: _AppColors.berry),
+          selectedLabelTextStyle: TextStyle(
+            color: _AppColors.primaryText,
+            fontWeight: FontWeight.w500,
+          ),
+          unselectedIconTheme: IconThemeData(color: _AppColors.secondaryText),
+          unselectedLabelTextStyle: TextStyle(color: _AppColors.secondaryText),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: _AppColors.surface,
+          hintStyle: const TextStyle(color: _AppColors.secondaryText),
+          labelStyle: const TextStyle(color: _AppColors.secondaryText),
+          prefixIconColor: _AppColors.secondaryText,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: _AppColors.outline),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: _AppColors.outline),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: _AppColors.berry, width: 1.2),
+          ),
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            backgroundColor: _AppColors.berry,
+            foregroundColor: _AppColors.primaryText,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: _AppColors.primaryText,
+            side: const BorderSide(color: _AppColors.outline),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+        listTileTheme: const ListTileThemeData(
+          contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+          selectedTileColor: _AppColors.berrySoft,
+          selectedColor: _AppColors.primaryText,
+          iconColor: _AppColors.secondaryText,
+          textColor: _AppColors.primaryText,
+        ),
+        iconButtonTheme: IconButtonThemeData(
+          style: IconButton.styleFrom(
+            foregroundColor: _AppColors.secondaryText,
+            hoverColor: _AppColors.surfaceRaised,
+          ),
+        ),
+        sliderTheme: const SliderThemeData(
+          activeTrackColor: _AppColors.berry,
+          inactiveTrackColor: _AppColors.outline,
+          thumbColor: _AppColors.primaryText,
+          overlayColor: _AppColors.berrySoft,
+          trackHeight: 3,
+        ),
+        popupMenuTheme: PopupMenuThemeData(
+          color: _AppColors.surfaceRaised,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        dialogTheme: DialogThemeData(
+          backgroundColor: _AppColors.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
         useMaterial3: true,
       ),
       home: WindowsHomePage(database: database, library: library),
@@ -845,24 +957,22 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
         autofocus: true,
         child: Scaffold(
           bottomNavigationBar: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: _PlayerBar(
-                song: _nowPlaying,
-                status: _status,
-                position: _playbackPosition,
-                duration: _playbackDuration,
-                isPaused: _isPlaybackPaused,
-                onTogglePlayback: _nowPlaying == null ? null : _togglePlayback,
-                onPrevious: _nowPlaying == null ? null : _previousTrack,
-                onNext: _nowPlaying == null ? null : _nextTrack,
-                onStop: _stopPlayback,
-                onSeek: _nowPlaying == null ? null : _seekPlayback,
-                playbackMode: _playbackMode,
-                onSelectPlaybackMode: _setPlaybackMode,
-                queueLength: _queue.length,
-                onOpenQueue: _openQueue,
-              ),
+            top: false,
+            child: _PlayerBar(
+              song: _nowPlaying,
+              status: _status,
+              position: _playbackPosition,
+              duration: _playbackDuration,
+              isPaused: _isPlaybackPaused,
+              onTogglePlayback: _nowPlaying == null ? null : _togglePlayback,
+              onPrevious: _nowPlaying == null ? null : _previousTrack,
+              onNext: _nowPlaying == null ? null : _nextTrack,
+              onStop: _stopPlayback,
+              onSeek: _nowPlaying == null ? null : _seekPlayback,
+              playbackMode: _playbackMode,
+              onSelectPlaybackMode: _setPlaybackMode,
+              queueLength: _queue.length,
+              onOpenQueue: _openQueue,
             ),
           ),
           body: LayoutBuilder(
@@ -872,13 +982,16 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
                 children: [
                   NavigationRail(
                     extended: extended,
-                    minExtendedWidth: 188,
+                    minWidth: 76,
+                    minExtendedWidth: 216,
+                    useIndicator: true,
+                    groupAlignment: -0.78,
                     selectedIndex: _page.index,
                     onDestinationSelected: (index) {
                       setState(() => _page = _WindowsPage.values[index]);
                     },
                     leading: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      padding: const EdgeInsets.fromLTRB(18, 28, 18, 32),
                       child: extended
                           ? const Text('壹加音乐', style: TextStyle(fontSize: 20))
                           : const Icon(Icons.graphic_eq),
@@ -901,10 +1014,15 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
                       ),
                     ],
                   ),
-                  const VerticalDivider(width: 1),
+                  const VerticalDivider(width: 1, color: _AppColors.outline),
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.all(20),
+                      padding: EdgeInsets.fromLTRB(
+                        constraints.maxWidth >= 1050 ? 32 : 20,
+                        28,
+                        constraints.maxWidth >= 1050 ? 32 : 20,
+                        24,
+                      ),
                       child: _buildPage(),
                     ),
                   ),
@@ -1101,23 +1219,39 @@ class _PageHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final heading = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 4),
-              Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
-            ],
-          ),
+        Text(title, style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: 6),
+        Text(
+          subtitle,
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: _AppColors.secondaryText),
         ),
-        if (actions.isNotEmpty) ...[
-          const SizedBox(width: 16),
-          Wrap(spacing: 8, runSpacing: 8, children: actions),
-        ],
       ],
+    );
+    final actionRow = Wrap(spacing: 8, runSpacing: 8, children: actions);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (actions.isEmpty) {
+          return heading;
+        }
+        if (constraints.maxWidth < 720) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [heading, const SizedBox(height: 16), actionRow],
+          );
+        }
+        return Row(
+          children: [
+            Expanded(child: heading),
+            const SizedBox(width: 16),
+            actionRow,
+          ],
+        );
+      },
     );
   }
 }
@@ -1139,11 +1273,12 @@ class _Toolbar extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        border: Border.all(color: Theme.of(context).dividerColor),
+        color: _AppColors.surface,
+        border: Border.all(color: _AppColors.outline),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1236,11 +1371,11 @@ class _PlayerBarState extends State<_PlayerBar> {
         _dragValue ?? widget.position.inMilliseconds.clamp(0, maxMs).toDouble();
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainer,
-        border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
+        color: _AppColors.surface,
+        border: const Border(top: BorderSide(color: _AppColors.outline)),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        padding: const EdgeInsets.fromLTRB(28, 12, 28, 10),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1300,6 +1435,11 @@ class _PlayerBarState extends State<_PlayerBar> {
                           tooltip: widget.isPaused ? '继续播放' : '暂停播放',
                           iconSize: 42,
                           onPressed: widget.onTogglePlayback,
+                          style: IconButton.styleFrom(
+                            backgroundColor: _AppColors.berry,
+                            foregroundColor: _AppColors.primaryText,
+                            minimumSize: const Size(54, 54),
+                          ),
                           icon: Icon(
                             widget.isPaused
                                 ? Icons.play_circle_filled
@@ -1437,6 +1577,18 @@ class _QueueDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      alignment: Alignment.centerRight,
+      insetPadding: const EdgeInsets.only(left: 360, top: 18, bottom: 18),
+      backgroundColor: _AppColors.surface,
+      titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+      actionsPadding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(8),
+          bottomLeft: Radius.circular(8),
+        ),
+      ),
       title: Row(
         children: [
           const Icon(Icons.queue_music),
@@ -1445,8 +1597,8 @@ class _QueueDialog extends StatelessWidget {
         ],
       ),
       content: SizedBox(
-        width: 560,
-        height: 420,
+        width: 420,
+        height: MediaQuery.sizeOf(context).height - 160,
         child: queue.isEmpty
             ? const Center(child: Text('播放队列为空'))
             : ReorderableListView.builder(
@@ -1509,11 +1661,12 @@ class _SyncPanel extends StatelessWidget {
     final active = session != null && payloadText != null;
     return DecoratedBox(
       decoration: BoxDecoration(
-        border: Border.all(color: Theme.of(context).dividerColor),
+        color: _AppColors.surface,
+        border: Border.all(color: _AppColors.outline),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1619,7 +1772,7 @@ class _ImportSummary extends StatelessWidget {
     final value = result!;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        color: _AppColors.berrySoft,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Padding(
@@ -1692,7 +1845,8 @@ class _PlaylistPanel extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        border: Border.all(color: Theme.of(context).dividerColor),
+        color: _AppColors.surface,
+        border: Border.all(color: _AppColors.outline),
         borderRadius: BorderRadius.circular(8),
       ),
       child: LayoutBuilder(
@@ -1838,7 +1992,8 @@ class _SongList extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        border: Border.all(color: Theme.of(context).dividerColor),
+        color: _AppColors.surface,
+        border: Border.all(color: _AppColors.outline),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(

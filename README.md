@@ -135,6 +135,16 @@ Android debug APK：
 D:\Projects\music_sync_player\release\android\music_sync_player_v1_debug.apk
 ```
 
+## Windows 界面设计更新
+
+- Windows 首页改为深石墨分层界面：背景、导航、内容区和播放控制区使用不同深浅的灰黑表面，不再是默认蓝白或蓝紫色风格。
+- 主强调色调整为低饱和莓红，绿色只用于成功状态；不使用大面积纯色、渐变或装饰性光效。
+- 统一 `Microsoft YaHei UI` 的字号和字重：页面标题使用 600，歌曲标题和按钮使用 500，说明文字使用 400。
+- 左侧导航、搜索框、歌曲列表、歌单和导入/同步页采用细分隔线与留白组织；导入和同步仍在独立页面，不占用听歌首页。
+- 底部播放条改为全宽固定控制台，保持居中的上一首、播放/暂停、下一首；播放模式、队列和停止位于右侧。
+- 播放队列改为右侧展开式面板，可查看、点歌、拖动排序、移除待播歌曲和清空待播放内容。
+- 本轮 Windows 验证已通过：`flutter analyze`、`flutter test`、`flutter build windows`。最新运行包：`release\\windows\\MusicSyncPlayer\\windows_app.exe`。
+
 ## 最新 Windows 播放器体验
 
 - Windows 界面统一使用 `Microsoft YaHei UI`，标题、正文和按钮采用固定字重层级，避免同一页面忽粗忽细。
