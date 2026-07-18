@@ -15,7 +15,7 @@ D:\Projects\music_sync_player\release\windows\MusicSyncPlayer\
 Windows executable:
 
 ```text
-D:\Projects\music_sync_player\release\windows\MusicSyncPlayer\windows_app.exe
+D:\Projects\music_sync_player\release\windows\MusicSyncPlayer\YijiaMusic.exe
 ```
 
 Android debug APK:
@@ -60,7 +60,7 @@ The `release/` directory is ignored by Git and should not be committed.
    D:\Projects\music_sync_player\release\windows\MusicSyncPlayer\
    ```
 
-2. Double-click `windows_app.exe`.
+2. Double-click `YijiaMusic.exe`.
 3. The default `音乐库` page is for searching and playing music.
 4. Open `添加歌曲` when you want to import audio files or a folder.
 5. Create a playlist and add songs from the music library.
@@ -135,6 +135,7 @@ Note: Windows local playback currently uses `ffplay` from the local machine to s
 
 - Fixed the native window title so `壹加音乐` renders correctly regardless of the Windows system code page.
 - Performed a clean Windows rebuild and inspected the generated EXE icon directly to confirm it contains the approved green music mark.
+- Renamed the delivered Windows entry point to `YijiaMusic.exe` so Explorer treats it as the branded application rather than reusing the old `windows_app.exe` icon cache.
 
 ## Still Needs Manual Confirmation
 

@@ -126,7 +126,7 @@ D:\Projects\music_sync_player\release\windows\MusicSyncPlayer\
 Windows 启动文件：
 
 ```text
-D:\Projects\music_sync_player\release\windows\MusicSyncPlayer\windows_app.exe
+D:\Projects\music_sync_player\release\windows\MusicSyncPlayer\YijiaMusic.exe
 ```
 
 Android debug APK：
@@ -143,7 +143,7 @@ D:\Projects\music_sync_player\release\android\music_sync_player_v1_debug.apk
 - 左侧导航、搜索框、歌曲列表、歌单和导入/同步页采用细分隔线与留白组织；导入和同步仍在独立页面，不占用听歌首页。
 - 底部播放条改为明亮的全宽固定控制台，保持居中的上一首、播放/暂停、下一首；播放键为深绿实心按钮配白色图标，其他操作图标使用高对比深色。
 - 播放队列改为右侧展开式面板，可查看、点歌、拖动排序、移除待播歌曲和清空待播放内容。
-- 本轮 Windows 验证已通过：`flutter analyze`、`flutter test`、`flutter build windows`。最新运行包：`release\\windows\\MusicSyncPlayer\\windows_app.exe`。
+- 本轮 Windows 验证已通过：`flutter analyze`、`flutter test`、`flutter build windows`。最新运行包：`release\\windows\\MusicSyncPlayer\\YijiaMusic.exe`。
 
 ## 最新 Windows 播放器体验
 
@@ -152,7 +152,7 @@ D:\Projects\music_sync_player\release\android\music_sync_player_v1_debug.apk
 - 支持顺序播放、列表循环、单曲循环和随机播放；队列可以查看、拖动排序、点歌播放、移除待播歌曲和清空待播放内容。
 - 全部歌曲和歌单歌曲的更多菜单均可“播放下一首”或“加入播放队列”；双击歌曲也可以开始播放。
 - 键盘快捷键：`Ctrl + 空格` 播放/暂停，`Ctrl + 左/右` 上一首/下一首，`Alt + 左/右` 后退/前进 5 秒。
-- Windows 验证已通过：`flutter analyze`、`flutter test`、`flutter build windows`。最新可运行版本在 `release\\windows\\MusicSyncPlayer\\windows_app.exe`。
+- Windows 验证已通过：`flutter analyze`、`flutter test`、`flutter build windows`。最新可运行版本在 `release\\windows\\MusicSyncPlayer\\YijiaMusic.exe`。
 
 `release/` 是交付输出目录，不提交到 Git。
 
@@ -166,7 +166,7 @@ D:\Projects\music_sync_player\release\android\music_sync_player_v1_debug.apk
    D:\Projects\music_sync_player\release\windows\MusicSyncPlayer\
    ```
 
-2. 双击 `windows_app.exe`。
+2. 双击 `YijiaMusic.exe`。
 3. 默认进入“音乐库”，可直接搜索、播放歌曲和管理歌单。
 4. 需要导入时，点击左侧“添加歌曲”，再选择导入音频文件或导入文件夹。
 5. 需要同步时，点击左侧“Wi-Fi 同步”，开启同步模式并查看二维码和连接码。
@@ -248,6 +248,6 @@ D:\Projects\music_sync_player\release\android\music_sync_player_v1_debug.apk
 ## 品牌标志
 
 - Windows 端已使用确认后的壹加音乐标志：左侧导航会显示品牌图标和名称，收起导航时仍保留图标。
-- Windows 安装包的 `windows_app.exe` 已内嵌同一枚图标，桌面或文件夹中显示的程序图标会随本次发布更新。
+- Windows 安装包使用正式文件名 `YijiaMusic.exe`，已内嵌同一枚图标；新的文件名也能避免资源管理器继续沿用旧工程名的图标缓存。
 - 原生 Windows 窗口标题使用稳定的 Unicode 写法显示为“壹加音乐”，避免因电脑的系统编码不同而出现乱码。
 - 品牌图源在 `apps/windows_app/assets/branding/yijia_music_logo.png`；它是工程资源，不是构建产物。

@@ -222,7 +222,7 @@
 
 交付产物：
 
-- Windows：`release\windows\MusicSyncPlayer\windows_app.exe`。
+- Windows：`release\windows\MusicSyncPlayer\YijiaMusic.exe`。
 - Android：`release\android\music_sync_player_v1_debug.apk`。
 
 说明：
@@ -279,3 +279,4 @@
 - 修复原生窗口标题乱码：改用明确的 Unicode 码位创建“壹加音乐”窗口标题，不再依赖 Windows 电脑当前的代码页。
 - 对 Windows 工程执行 `flutter clean` 后完整重建，确保新的 ICO 资源被重新编译进 EXE，而不是沿用旧的 Flutter 图标缓存。
 - 已从新生成的 `windows_app.exe` 直接提取图标核对，结果为确认后的绿色折面音乐标志。
+- 交付程序名称调整为 `YijiaMusic.exe`，移除默认工程名作为用户启动入口，并让 Windows 将它作为新的应用程序读取图标。

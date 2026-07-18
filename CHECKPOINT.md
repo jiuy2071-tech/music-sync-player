@@ -38,7 +38,7 @@ D:\Projects\music_sync_player
 - Android 真机断网或关闭同步模式后的离线播放。
 
 Phase 8 已整理交付产物：
-- Windows：`release\windows\MusicSyncPlayer\windows_app.exe`
+- Windows：`release\windows\MusicSyncPlayer\YijiaMusic.exe`
 - Android：`release\android\music_sync_player_v1_debug.apk`
 - 说明：`RELEASE_NOTES.md` 和 `release\RELEASE_NOTES.md`
 
@@ -73,14 +73,14 @@ dart analyze
 ## 最新完成项
 
 - Windows 播放器体验已补齐并已提交前验证：统一字体层级、居中的上一首/播放/下一首、播放队列、播放模式和快捷键。
-- 最新 Windows 运行包已重新构建并同步到：`D:\Projects\music_sync_player\release\windows\MusicSyncPlayer\windows_app.exe`。
+- 最新 Windows 运行包已重新构建并同步到：`D:\Projects\music_sync_player\release\windows\MusicSyncPlayer\YijiaMusic.exe`。
 - 本轮只修改 Windows 端，因此没有重复构建 Android APK。
 
 ## 2026-07-18 Windows 视觉更新
 
 - 已完成深石墨、莓红、青柠点缀的 Windows 界面重设计，并保留全部既有 V1 功能。
 - 已通过 Windows `flutter analyze`、`flutter test` 和 `flutter build windows`。
-- 新版运行包已同步到：`D:\Projects\music_sync_player\release\windows\MusicSyncPlayer\windows_app.exe`。
+- 新版运行包已同步到：`D:\Projects\music_sync_player\release\windows\MusicSyncPlayer\YijiaMusic.exe`。
 
 ## 2026-07-18 浅色高对比修订
 
@@ -90,8 +90,8 @@ dart analyze
 
 ## 2026-07-18 品牌标志已应用
 
-- 已将确认后的壹加音乐品牌标志接入 Windows 左侧导航与 `windows_app.exe` 图标资源。
-- 重新通过 Windows `flutter analyze`、`flutter test` 和 `flutter build windows`；验收运行包将在提交前同步到 `D:\Projects\music_sync_player\release\windows\MusicSyncPlayer\windows_app.exe`。
+- 已将确认后的壹加音乐品牌标志接入 Windows 左侧导航与 Windows 图标资源。
+- 重新通过 Windows `flutter analyze`、`flutter test` 和 `flutter build windows`；验收运行包将在提交前同步到 `D:\Projects\music_sync_player\release\windows\MusicSyncPlayer\YijiaMusic.exe`。
 - 本轮只改变 Windows 品牌呈现，没有改动 Android 功能或重新构建 APK。
 
 ## 2026-07-18 Windows 标题和图标修复
@@ -99,3 +99,4 @@ dart analyze
 - Windows 原生标题已改为稳定的 Unicode 写法，修复部分电脑上“壹加音乐”显示乱码的问题。
 - 已执行一次 Windows 干净构建，并从刚生成的 EXE 提取图标确认是绿色折面音乐标志。
 - 完整交付目录会在本次提交前重新同步；Android 本轮无改动。
+- Windows 交付入口改为 `release\\windows\\MusicSyncPlayer\\YijiaMusic.exe`，不再让用户启动默认工程名 `windows_app.exe`。
