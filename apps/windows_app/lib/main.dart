@@ -17,16 +17,17 @@ import 'windows_audio_player.dart';
 class _AppColors {
   const _AppColors._();
 
-  static const background = Color(0xFF17181A);
-  static const sidebar = Color(0xFF121315);
-  static const surface = Color(0xFF202225);
-  static const surfaceRaised = Color(0xFF292C30);
-  static const outline = Color(0xFF383B40);
-  static const primaryText = Color(0xFFF1F0EE);
-  static const secondaryText = Color(0xFFA8A5A2);
-  static const berry = Color(0xFFC95670);
-  static const berrySoft = Color(0xFF3A222B);
-  static const lime = Color(0xFFB9D267);
+  static const background = Color(0xFFF2F4F0);
+  static const sidebar = Color(0xFFE7EBE3);
+  static const surface = Color(0xFFFCFDF9);
+  static const surfaceRaised = Color(0xFFF0F3EC);
+  static const outline = Color(0xFFD0D6CD);
+  static const primaryText = Color(0xFF1D231D);
+  static const secondaryText = Color(0xFF60695F);
+  static const forest = Color(0xFF2C664C);
+  static const forestSoft = Color(0xFFDDEBDD);
+  static const signal = Color(0xFFCDEB72);
+  static const signalSoft = Color(0xFFF0F6D8);
 }
 
 Future<void> main() async {
@@ -86,22 +87,22 @@ class WindowsMusicApp extends StatelessWidget {
         height: 1.2,
       ),
     );
-    final colorScheme = const ColorScheme.dark(
-      primary: _AppColors.berry,
-      onPrimary: _AppColors.primaryText,
-      secondary: _AppColors.lime,
-      onSecondary: _AppColors.background,
+    final colorScheme = const ColorScheme.light(
+      primary: _AppColors.forest,
+      onPrimary: Color(0xFFFFFFFF),
+      secondary: _AppColors.signal,
+      onSecondary: _AppColors.primaryText,
       surface: _AppColors.surface,
       onSurface: _AppColors.primaryText,
       error: Color(0xFFE77A7A),
-      onError: _AppColors.background,
+      onError: Color(0xFFFFFFFF),
       outline: _AppColors.outline,
     );
     return MaterialApp(
       title: '壹加音乐',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        brightness: Brightness.dark,
+        brightness: Brightness.light,
         colorScheme: colorScheme,
         fontFamily: 'Microsoft YaHei UI',
         textTheme: textTheme,
@@ -114,8 +115,8 @@ class WindowsMusicApp extends StatelessWidget {
         ),
         navigationRailTheme: const NavigationRailThemeData(
           backgroundColor: _AppColors.sidebar,
-          indicatorColor: _AppColors.berrySoft,
-          selectedIconTheme: IconThemeData(color: _AppColors.berry),
+          indicatorColor: _AppColors.forestSoft,
+          selectedIconTheme: IconThemeData(color: _AppColors.forest),
           selectedLabelTextStyle: TextStyle(
             color: _AppColors.primaryText,
             fontWeight: FontWeight.w500,
@@ -139,13 +140,13 @@ class WindowsMusicApp extends StatelessWidget {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: _AppColors.berry, width: 1.2),
+            borderSide: const BorderSide(color: _AppColors.forest, width: 1.2),
           ),
         ),
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
-            backgroundColor: _AppColors.berry,
-            foregroundColor: _AppColors.primaryText,
+            backgroundColor: _AppColors.forest,
+            foregroundColor: Color(0xFFFFFFFF),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
@@ -164,22 +165,24 @@ class WindowsMusicApp extends StatelessWidget {
         ),
         listTileTheme: const ListTileThemeData(
           contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-          selectedTileColor: _AppColors.berrySoft,
+          selectedTileColor: _AppColors.forestSoft,
           selectedColor: _AppColors.primaryText,
           iconColor: _AppColors.secondaryText,
           textColor: _AppColors.primaryText,
         ),
         iconButtonTheme: IconButtonThemeData(
           style: IconButton.styleFrom(
-            foregroundColor: _AppColors.secondaryText,
-            hoverColor: _AppColors.surfaceRaised,
+            foregroundColor: _AppColors.primaryText,
+            disabledForegroundColor: _AppColors.secondaryText,
+            hoverColor: _AppColors.forestSoft,
+            minimumSize: const Size(40, 40),
           ),
         ),
         sliderTheme: const SliderThemeData(
-          activeTrackColor: _AppColors.berry,
+          activeTrackColor: _AppColors.forest,
           inactiveTrackColor: _AppColors.outline,
-          thumbColor: _AppColors.primaryText,
-          overlayColor: _AppColors.berrySoft,
+          thumbColor: _AppColors.forest,
+          overlayColor: _AppColors.forestSoft,
           trackHeight: 3,
         ),
         popupMenuTheme: PopupMenuThemeData(
@@ -1436,8 +1439,8 @@ class _PlayerBarState extends State<_PlayerBar> {
                           iconSize: 42,
                           onPressed: widget.onTogglePlayback,
                           style: IconButton.styleFrom(
-                            backgroundColor: _AppColors.berry,
-                            foregroundColor: _AppColors.primaryText,
+                            backgroundColor: _AppColors.forest,
+                            foregroundColor: const Color(0xFFFFFFFF),
                             minimumSize: const Size(54, 54),
                           ),
                           icon: Icon(
@@ -1772,7 +1775,7 @@ class _ImportSummary extends StatelessWidget {
     final value = result!;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: _AppColors.berrySoft,
+        color: _AppColors.signalSoft,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Padding(

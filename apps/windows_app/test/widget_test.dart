@@ -19,8 +19,8 @@ void main() {
     );
 
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
-    expect(app.theme?.brightness, Brightness.dark);
-    expect(app.theme?.colorScheme.primary, const Color(0xFFC95670));
+    expect(app.theme?.brightness, Brightness.light);
+    expect(app.theme?.colorScheme.primary, const Color(0xFF2C664C));
 
     expect(find.byIcon(Icons.graphic_eq), findsOneWidget);
     expect(find.byIcon(Icons.skip_previous_rounded), findsOneWidget);

@@ -257,3 +257,12 @@
 - 底部播放器改为全宽稳定控制台；播放队列改为贴右侧的展开面板样式。
 - 新增 Widget 测试，固定验证 Windows 使用深色主题与莓红主色。
 - 验证通过：`apps/windows_app` 的 `flutter analyze`、`flutter test`、`flutter build windows`；新版完整运行目录已同步到 `release\\windows\\MusicSyncPlayer`。
+
+### Phase 8：Windows 浅色高对比修订
+
+- 根据实际界面反馈，撤销深石墨与莓红的视觉方向，避免界面过黑、操作图标难以辨识和与内容平台相似的问题。
+- 主题改为雾灰绿的浅色分层：背景 `#F2F4F0`、导航 `#E7EBE3`、内容表面 `#FCFDF9`，文字和图标采用清晰的深墨绿。
+- 主按钮和进度条改为深森林绿 `#2C664C`，选中行改为淡鼠尾草绿；中央播放键使用白色图标，确保一眼可辨。
+- 所有普通图标按钮提升为深色前景、40px 最小点击区域和淡绿色悬停反馈，禁用状态也保留可读的灰绿色。
+- 更新 Widget 测试，验证 Windows 使用浅色主题与森林绿主色。
+- 验证通过：`apps/windows_app` 的 `flutter analyze`、`flutter test` 和 `flutter build windows`；新版完整运行目录已同步到 `release\\windows\\MusicSyncPlayer`。
