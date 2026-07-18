@@ -999,8 +999,8 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
                     leading: Padding(
                       padding: const EdgeInsets.fromLTRB(18, 28, 18, 32),
                       child: extended
-                          ? const Text('壹加音乐', style: TextStyle(fontSize: 20))
-                          : const Icon(Icons.graphic_eq),
+                          ? const _BrandMark(extended: true)
+                          : const _BrandMark(extended: false),
                     ),
                     destinations: const [
                       NavigationRailDestination(
@@ -1258,6 +1258,41 @@ class _PageHeader extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class _BrandMark extends StatelessWidget {
+  const _BrandMark({required this.extended});
+
+  final bool extended;
+
+  @override
+  Widget build(BuildContext context) {
+    final mark = ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Image.asset(
+        'assets/branding/yijia_music_logo.png',
+        width: 32,
+        height: 32,
+        fit: BoxFit.cover,
+      ),
+    );
+    if (!extended) {
+      return mark;
+    }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        mark,
+        const SizedBox(width: 10),
+        Text(
+          '壹加音乐',
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(color: _AppColors.primaryText),
+        ),
+      ],
     );
   }
 }

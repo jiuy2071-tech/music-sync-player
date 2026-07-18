@@ -87,3 +87,9 @@ dart analyze
 - 已根据界面反馈将 Windows 主题改为浅色雾灰绿，移除大面积深色背景和莓红主色。
 - 播放键、进度条、图标和选中状态已提高对比度，避免操作键看不清。
 - 已通过 Windows `flutter analyze`、`flutter test` 和 `flutter build windows`，新版运行包已同步到 release。
+
+## 2026-07-18 品牌标志已应用
+
+- 已将确认后的壹加音乐品牌标志接入 Windows 左侧导航与 `windows_app.exe` 图标资源。
+- 重新通过 Windows `flutter analyze`、`flutter test` 和 `flutter build windows`；验收运行包将在提交前同步到 `D:\Projects\music_sync_player\release\windows\MusicSyncPlayer\windows_app.exe`。
+- 本轮只改变 Windows 品牌呈现，没有改动 Android 功能或重新构建 APK。

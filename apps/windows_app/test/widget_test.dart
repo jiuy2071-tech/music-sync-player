@@ -30,7 +30,16 @@ void main() {
       FontWeight.w400,
     );
 
-    expect(find.byIcon(Icons.graphic_eq), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Image &&
+            widget.image is AssetImage &&
+            (widget.image as AssetImage).assetName ==
+                'assets/branding/yijia_music_logo.png',
+      ),
+      findsOneWidget,
+    );
     expect(find.byIcon(Icons.skip_previous_rounded), findsOneWidget);
     expect(find.byIcon(Icons.skip_next_rounded), findsOneWidget);
     expect(find.byIcon(Icons.queue_music_outlined), findsOneWidget);

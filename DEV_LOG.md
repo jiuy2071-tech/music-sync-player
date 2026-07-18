@@ -266,3 +266,10 @@
 - 所有普通图标按钮提升为深色前景、40px 最小点击区域和淡绿色悬停反馈，禁用状态也保留可读的灰绿色。
 - 更新 Widget 测试，验证 Windows 使用浅色主题与森林绿主色。
 - 验证通过：`apps/windows_app` 的 `flutter analyze`、`flutter test` 和 `flutter build windows`；新版完整运行目录已同步到 `release\\windows\\MusicSyncPlayer`。
+
+### Phase 8：壹加音乐品牌标志
+
+- 根据确认后的绿色折面音乐标志，新增 Flutter 品牌资源 `assets/branding/yijia_music_logo.png`。
+- Windows 左侧导航的文字标识替换为图标加“壹加音乐”；收起导航后保留图标，避免丢失产品识别。
+- Windows 原生程序标题、文件描述、产品名和 ICO 图标均已同步为壹加音乐品牌。
+- 已通过 `apps/windows_app` 的 `flutter analyze`、`flutter test` 和 `flutter build windows`；完整运行目录已重新同步到 `release\\windows\\MusicSyncPlayer`。

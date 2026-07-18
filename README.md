@@ -244,3 +244,9 @@ D:\Projects\music_sync_player\apps\android_app\build\app\outputs\flutter-apk\app
 ```text
 D:\Projects\music_sync_player\release\android\music_sync_player_v1_debug.apk
 ```
+
+## 品牌标志
+
+- Windows 端已使用确认后的壹加音乐标志：左侧导航会显示品牌图标和名称，收起导航时仍保留图标。
+- Windows 安装包的 `windows_app.exe` 已内嵌同一枚图标，桌面或文件夹中显示的程序图标会随本次发布更新。
+- 品牌图源在 `apps/windows_app/assets/branding/yijia_music_logo.png`；它是工程资源，不是构建产物。

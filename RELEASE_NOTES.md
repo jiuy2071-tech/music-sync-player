@@ -125,6 +125,12 @@ Note: Windows local playback currently uses `ffplay` from the local machine to s
 - Added a widget test that guards the light theme and forest-green primary color.
 - Verified this visual refresh with `flutter analyze`, `flutter test`, and `flutter build windows`.
 
+## Yijia Music Branding
+
+- Added the approved green folded music mark to the Windows navigation header and compact navigation state.
+- Embedded the same mark in the Windows executable icon, with the native window title and product metadata updated to `壹加音乐`.
+- Verified this branding update with Windows `flutter analyze`, `flutter test`, and `flutter build windows`.
+
 ## Still Needs Manual Confirmation
 
 - Windows real file picker and folder picker interaction.
