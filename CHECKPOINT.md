@@ -93,3 +93,9 @@ dart analyze
 - 已将确认后的壹加音乐品牌标志接入 Windows 左侧导航与 `windows_app.exe` 图标资源。
 - 重新通过 Windows `flutter analyze`、`flutter test` 和 `flutter build windows`；验收运行包将在提交前同步到 `D:\Projects\music_sync_player\release\windows\MusicSyncPlayer\windows_app.exe`。
 - 本轮只改变 Windows 品牌呈现，没有改动 Android 功能或重新构建 APK。
+
+## 2026-07-18 Windows 标题和图标修复
+
+- Windows 原生标题已改为稳定的 Unicode 写法，修复部分电脑上“壹加音乐”显示乱码的问题。
+- 已执行一次 Windows 干净构建，并从刚生成的 EXE 提取图标确认是绿色折面音乐标志。
+- 完整交付目录会在本次提交前重新同步；Android 本轮无改动。

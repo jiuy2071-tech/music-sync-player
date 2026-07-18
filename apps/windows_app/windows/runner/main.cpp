@@ -27,7 +27,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   FlutterWindow window(project);
   Win32Window::Point origin(10, 10);
   Win32Window::Size size(1280, 720);
-  if (!window.Create(L"壹加音乐", origin, size)) {
+  // Use Unicode code points so the native Windows compiler never treats the
+  // UTF-8 source bytes as the active system code page.
+  if (!window.Create(L"\x58F9\x52A0\x97F3\x4E50", origin, size)) {
     return EXIT_FAILURE;
   }
   window.SetQuitOnClose(true);

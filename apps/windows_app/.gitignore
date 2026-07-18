@@ -33,6 +33,9 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Local inspection output created while checking the embedded Windows icon.
+/assets/branding/_icon_preview.png
+
 # Symbolication related
 app.*.symbols
 

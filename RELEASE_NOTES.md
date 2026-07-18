@@ -131,6 +131,11 @@ Note: Windows local playback currently uses `ffplay` from the local machine to s
 - Embedded the same mark in the Windows executable icon, with the native window title and product metadata updated to `壹加音乐`.
 - Verified this branding update with Windows `flutter analyze`, `flutter test`, and `flutter build windows`.
 
+## Windows Branding Fix
+
+- Fixed the native window title so `壹加音乐` renders correctly regardless of the Windows system code page.
+- Performed a clean Windows rebuild and inspected the generated EXE icon directly to confirm it contains the approved green music mark.
+
 ## Still Needs Manual Confirmation
 
 - Windows real file picker and folder picker interaction.

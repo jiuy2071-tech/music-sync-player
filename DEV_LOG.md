@@ -273,3 +273,9 @@
 - Windows 左侧导航的文字标识替换为图标加“壹加音乐”；收起导航后保留图标，避免丢失产品识别。
 - Windows 原生程序标题、文件描述、产品名和 ICO 图标均已同步为壹加音乐品牌。
 - 已通过 `apps/windows_app` 的 `flutter analyze`、`flutter test` 和 `flutter build windows`；完整运行目录已重新同步到 `release\\windows\\MusicSyncPlayer`。
+
+### Phase 8：Windows 品牌资源修复
+
+- 修复原生窗口标题乱码：改用明确的 Unicode 码位创建“壹加音乐”窗口标题，不再依赖 Windows 电脑当前的代码页。
+- 对 Windows 工程执行 `flutter clean` 后完整重建，确保新的 ICO 资源被重新编译进 EXE，而不是沿用旧的 Flutter 图标缓存。
+- 已从新生成的 `windows_app.exe` 直接提取图标核对，结果为确认后的绿色折面音乐标志。
