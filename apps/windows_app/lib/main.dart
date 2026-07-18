@@ -119,10 +119,13 @@ class WindowsMusicApp extends StatelessWidget {
           selectedIconTheme: IconThemeData(color: _AppColors.forest),
           selectedLabelTextStyle: TextStyle(
             color: _AppColors.primaryText,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w600,
           ),
           unselectedIconTheme: IconThemeData(color: _AppColors.secondaryText),
-          unselectedLabelTextStyle: TextStyle(color: _AppColors.secondaryText),
+          unselectedLabelTextStyle: TextStyle(
+            color: _AppColors.secondaryText,
+            fontWeight: FontWeight.w400,
+          ),
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
@@ -1481,11 +1484,7 @@ class _PlayerBarState extends State<_PlayerBar> {
                         IconButton(
                           tooltip: '播放队列（${widget.queueLength}）',
                           onPressed: widget.onOpenQueue,
-                          icon: Badge(
-                            isLabelVisible: widget.queueLength > 0,
-                            label: Text('${widget.queueLength}'),
-                            child: const Icon(Icons.queue_music_outlined),
-                          ),
+                          icon: const Icon(Icons.queue_music_outlined),
                         ),
                         IconButton(
                           tooltip: '停止播放',

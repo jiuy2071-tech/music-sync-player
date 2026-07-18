@@ -21,11 +21,20 @@ void main() {
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     expect(app.theme?.brightness, Brightness.light);
     expect(app.theme?.colorScheme.primary, const Color(0xFF2C664C));
+    expect(
+      app.theme?.navigationRailTheme.selectedLabelTextStyle?.fontWeight,
+      FontWeight.w600,
+    );
+    expect(
+      app.theme?.navigationRailTheme.unselectedLabelTextStyle?.fontWeight,
+      FontWeight.w400,
+    );
 
     expect(find.byIcon(Icons.graphic_eq), findsOneWidget);
     expect(find.byIcon(Icons.skip_previous_rounded), findsOneWidget);
     expect(find.byIcon(Icons.skip_next_rounded), findsOneWidget);
     expect(find.byIcon(Icons.queue_music_outlined), findsOneWidget);
+    expect(find.byType(Badge), findsNothing);
     expect(find.text('音乐库'), findsAtLeastNWidgets(1));
     expect(find.text('选择一首歌曲开始播放'), findsOneWidget);
     final addSongsButton = find.widgetWithText(FilledButton, '添加歌曲');
