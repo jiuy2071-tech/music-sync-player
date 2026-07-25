@@ -253,14 +253,61 @@ Future<String> _findLanHost() async {
     includeLoopback: false,
     type: InternetAddressType.IPv4,
   );
-  for (final interface in interfaces) {
-    for (final address in interface.addresses) {
-      if (!address.isLoopback && !address.address.startsWith('169.254.')) {
-        return address.address;
-      }
+  final addresses = [
+    for (final interface in interfaces)
+      for (final address in interface.addresses) address.address,
+  ];
+  return selectPreferredLanHost(addresses) ??
+      InternetAddress.loopbackIPv4.address;
+}
+
+String? selectPreferredLanHost(Iterable<String> addresses) {
+  final usable = addresses.where(_isUsableIpv4).toList(growable: false);
+  for (final address in usable) {
+    if (_isPrivateLanAddress(address)) {
+      return address;
     }
   }
-  return InternetAddress.loopbackIPv4.address;
+  return usable.isEmpty ? null : usable.first;
+}
+
+bool _isUsableIpv4(String address) {
+  final octets = _ipv4Octets(address);
+  if (octets == null) {
+    return false;
+  }
+  final first = octets[0];
+  final second = octets[1];
+  return first != 0 &&
+      first != 127 &&
+      !(first == 169 && second == 254) &&
+      !(first == 198 && (second == 18 || second == 19)) &&
+      first < 224;
+}
+
+bool _isPrivateLanAddress(String address) {
+  final octets = _ipv4Octets(address);
+  if (octets == null) {
+    return false;
+  }
+  final first = octets[0];
+  final second = octets[1];
+  return first == 10 ||
+      (first == 172 && second >= 16 && second <= 31) ||
+      (first == 192 && second == 168);
+}
+
+List<int>? _ipv4Octets(String address) {
+  final octets = address.split('.');
+  if (octets.length != 4) {
+    return null;
+  }
+  final values = octets.map(int.tryParse).toList(growable: false);
+  if (values.any((value) => value == null)) {
+    return null;
+  }
+  final result = values.cast<int>();
+  return result.any((value) => value < 0 || value > 255) ? null : result;
 }
 
 String _randomToken(int byteCount) {

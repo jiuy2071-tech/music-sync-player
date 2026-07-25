@@ -11,6 +11,17 @@ void main() {
   late Directory tempDir;
   late WindowsSyncServer server;
 
+  test('prefers a private Wi-Fi address over a virtual proxy address', () {
+    expect(
+      selectPreferredLanHost(['198.18.0.1', '192.168.84.114']),
+      '192.168.84.114',
+    );
+  });
+
+  test('does not use a 198.18 virtual proxy address as a sync host', () {
+    expect(selectPreferredLanHost(['198.18.0.1']), isNull);
+  });
+
   setUp(() async {
     database = MusicDatabase.memory();
     tempDir = await Directory.systemTemp.createTemp('oneplus_music_sync_test_');
