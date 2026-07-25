@@ -890,6 +890,21 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
     }
   }
 
+  Future<void> _copySyncPayload() async {
+    final payload = _syncPayloadText;
+    if (_syncBusy || payload == null) {
+      return;
+    }
+
+    await Clipboard.setData(ClipboardData(text: payload));
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _syncStatus = '连接信息已复制。请在 Android 的“同步音乐”中选择手动粘贴后连接电脑端。';
+    });
+  }
+
   Future<String?> _askForName({
     required String title,
     required String initialValue,
@@ -1204,6 +1219,7 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
               payloadText: _syncPayloadText,
               onStart: _startSyncMode,
               onStop: _stopSyncMode,
+              onCopy: _copySyncPayload,
             ),
           ),
         ),
@@ -1684,6 +1700,7 @@ class _SyncPanel extends StatelessWidget {
     required this.payloadText,
     required this.onStart,
     required this.onStop,
+    required this.onCopy,
   });
 
   final bool busy;
@@ -1692,6 +1709,7 @@ class _SyncPanel extends StatelessWidget {
   final String? payloadText;
   final VoidCallback onStart;
   final VoidCallback onStop;
+  final Future<void> Function() onCopy;
 
   @override
   Widget build(BuildContext context) {
@@ -1729,6 +1747,11 @@ class _SyncPanel extends StatelessWidget {
                         onPressed: busy || !active ? null : onStop,
                         icon: const Icon(Icons.close),
                         label: const Text('关闭同步模式'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: busy || !active ? null : onCopy,
+                        icon: const Icon(Icons.content_copy_rounded),
+                        label: const Text('复制连接信息'),
                       ),
                       if (busy)
                         const SizedBox(
