@@ -26,6 +26,8 @@ class AndroidAudioPlayer {
 
   Future<void> seek(Duration position) => _player.seek(position);
 
+  Future<Duration?> getDuration() => _player.getDuration();
+
   Future<void> stop() async {
     await _player.stop();
     _currentSong = null;

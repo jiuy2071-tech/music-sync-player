@@ -299,18 +299,23 @@ class _AndroidHomePageState extends State<_AndroidHomePage> {
     final queueIndex = songs.indexWhere((item) => item.id == song.id);
     try {
       await _player.play(song);
+      final measuredDuration = await _player.getDuration();
       if (!mounted) {
         return;
       }
+      final importedDuration = song.durationMs == null
+          ? Duration.zero
+          : Duration(milliseconds: song.durationMs!);
       setState(() {
         _playQueue = songs;
         _queueIndex = queueIndex;
         _nowPlaying = song;
         _isPlaying = true;
         _playbackPosition = Duration.zero;
-        _playbackDuration = song.durationMs == null
-            ? Duration.zero
-            : Duration(milliseconds: song.durationMs!);
+        _playbackDuration =
+            measuredDuration != null && measuredDuration > Duration.zero
+            ? measuredDuration
+            : importedDuration;
         _status = '正在播放：${song.title}';
       });
     } catch (error) {
@@ -448,6 +453,8 @@ class _AndroidHomePageState extends State<_AndroidHomePage> {
         song: song,
         position: _playbackPosition,
         duration: _playbackDuration,
+        positionStream: _player.positionStream,
+        durationStream: _player.durationStream,
         isPlaying: _isPlaying,
         onPrevious: _playPrevious,
         onToggle: _togglePlayback,
@@ -1110,12 +1117,10 @@ class _MiniPlayer extends StatelessWidget {
   final VoidCallback onPrevious;
   final VoidCallback onToggle;
   final VoidCallback onNext;
-  final ValueChanged<Duration> onSeek;
+  final Future<void> Function(Duration) onSeek;
 
   @override
   Widget build(BuildContext context) {
-    final max = duration.inMilliseconds;
-    final value = position.inMilliseconds.clamp(0, max).toDouble();
     return Material(
       color: _AndroidColors.surface,
       child: Padding(
@@ -1188,12 +1193,10 @@ class _MiniPlayer extends StatelessWidget {
             ),
             SizedBox(
               height: 20,
-              child: Slider(
-                value: max == 0 ? 0 : value,
-                max: max == 0 ? 1 : max.toDouble(),
-                onChanged: max == 0
-                    ? null
-                    : (next) => onSeek(Duration(milliseconds: next.round())),
+              child: _PlaybackSeekSlider(
+                position: position,
+                duration: duration,
+                onSeek: onSeek,
               ),
             ),
           ],
@@ -1208,6 +1211,8 @@ class _NowPlayingSheet extends StatelessWidget {
     required this.song,
     required this.position,
     required this.duration,
+    required this.positionStream,
+    required this.durationStream,
     required this.isPlaying,
     required this.onPrevious,
     required this.onToggle,
@@ -1218,16 +1223,16 @@ class _NowPlayingSheet extends StatelessWidget {
   final Song song;
   final Duration position;
   final Duration duration;
+  final Stream<Duration> positionStream;
+  final Stream<Duration> durationStream;
   final bool isPlaying;
   final VoidCallback onPrevious;
   final VoidCallback onToggle;
   final VoidCallback onNext;
-  final ValueChanged<Duration> onSeek;
+  final Future<void> Function(Duration) onSeek;
 
   @override
   Widget build(BuildContext context) {
-    final max = duration.inMilliseconds;
-    final value = position.inMilliseconds.clamp(0, max).toDouble();
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 12, 24, 34),
@@ -1272,19 +1277,39 @@ class _NowPlayingSheet extends StatelessWidget {
               style: const TextStyle(color: _AndroidColors.muted),
             ),
             const SizedBox(height: 18),
-            Slider(
-              value: max == 0 ? 0 : value,
-              max: max == 0 ? 1 : max.toDouble(),
-              onChanged: max == 0
-                  ? null
-                  : (next) => onSeek(Duration(milliseconds: next.round())),
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(_formatDuration(position)),
-                Text(max == 0 ? '--:--' : _formatDuration(duration)),
-              ],
+            StreamBuilder<Duration>(
+              stream: positionStream,
+              initialData: position,
+              builder: (context, positionSnapshot) {
+                final livePosition = positionSnapshot.data ?? position;
+                return StreamBuilder<Duration>(
+                  stream: durationStream,
+                  initialData: duration,
+                  builder: (context, durationSnapshot) {
+                    final liveDuration = durationSnapshot.data ?? duration;
+                    return Column(
+                      children: [
+                        _PlaybackSeekSlider(
+                          position: livePosition,
+                          duration: liveDuration,
+                          onSeek: onSeek,
+                        ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(_formatDuration(livePosition)),
+                            Text(
+                              liveDuration == Duration.zero
+                                  ? '--:--'
+                                  : _formatDuration(liveDuration),
+                            ),
+                          ],
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
             ),
             const SizedBox(height: 10),
             Row(
@@ -1322,6 +1347,57 @@ class _NowPlayingSheet extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _PlaybackSeekSlider extends StatefulWidget {
+  const _PlaybackSeekSlider({
+    required this.position,
+    required this.duration,
+    required this.onSeek,
+  });
+
+  final Duration position;
+  final Duration duration;
+  final Future<void> Function(Duration) onSeek;
+
+  @override
+  State<_PlaybackSeekSlider> createState() => _PlaybackSeekSliderState();
+}
+
+class _PlaybackSeekSliderState extends State<_PlaybackSeekSlider> {
+  double? _previewValue;
+
+  @override
+  Widget build(BuildContext context) {
+    final max = widget.duration.inMilliseconds;
+    final enabled = max > 0;
+    final position = widget.position.inMilliseconds.clamp(0, max).toDouble();
+    final value = (_previewValue ?? position).clamp(0, max).toDouble();
+
+    return Slider(
+      value: enabled ? value : 0,
+      max: enabled ? max.toDouble() : 1,
+      onChangeStart: enabled
+          ? (next) => setState(() => _previewValue = next)
+          : null,
+      onChanged: enabled
+          ? (next) => setState(() => _previewValue = next)
+          : null,
+      onChangeEnd: enabled
+          ? (next) {
+              setState(() => _previewValue = next);
+              unawaited(_commitSeek(next));
+            }
+          : null,
+    );
+  }
+
+  Future<void> _commitSeek(double value) async {
+    await widget.onSeek(Duration(milliseconds: value.round()));
+    if (mounted) {
+      setState(() => _previewValue = null);
+    }
   }
 }
 
