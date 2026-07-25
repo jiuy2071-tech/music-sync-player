@@ -1,3 +1,5 @@
+# Changelog
+
 ## 0.0.1
 
-* TODO: Describe initial release.
+- Added V1 QR payload and connection request/response models.

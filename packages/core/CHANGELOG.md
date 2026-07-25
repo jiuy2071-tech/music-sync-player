@@ -1,3 +1,5 @@
+# Changelog
+
 ## 0.0.1
 
-* TODO: Describe initial release.
+- Added the shared V1 music-library, import and synchronization models.

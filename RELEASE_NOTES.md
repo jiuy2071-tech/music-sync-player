@@ -1,157 +1,60 @@
-# 壹加音乐 V1 Release Notes
+# 壹加音乐 V1 交付说明
 
-## Build Date
+## 最近构建
 
-2026-07-12
+最近一次已验证构建：`2026-07-18`。
 
-## Artifacts
+| 平台 | 交付文件 | 类型 |
+| --- | --- | --- |
+| Windows | `release\windows\MusicSyncPlayer\YijiaMusic.exe` | 完整 Windows 运行目录中的启动程序 |
+| Android | `release\android\music_sync_player_v1_debug.apk` | Debug APK |
 
-Windows runnable directory:
+`release/` 是本地交付目录，已被 Git 忽略。
 
-```text
-D:\Projects\music_sync_player\release\windows\MusicSyncPlayer\
-```
+## 已完成
 
-Windows executable:
+- Windows：导入 MP3、FLAC、M4A、WAV；文件夹导入；hash 去重；待整理命名；歌单；搜索；本地播放和播放队列。
+- Windows：Wi-Fi 同步模式、二维码、连接码、歌单清单和受限音频下载。
+- Android：扫码或手动粘贴连接信息；整张歌单同步；已同步歌曲和歌单搜索；删除本地缓存；离线本地播放。
+- Android：音乐库、歌单、同步音乐三页导航；同步完成后自动刷新本地库；迷你播放器与完整播放面板。
+- 两端：壹加音乐品牌名称、绿色折面标志和浅色高对比界面。
 
-```text
-D:\Projects\music_sync_player\release\windows\MusicSyncPlayer\YijiaMusic.exe
-```
+## 启动 Windows
 
-Android debug APK:
+1. 打开 `release\windows\MusicSyncPlayer\`。
+2. 双击 `YijiaMusic.exe`。
+3. 用“添加歌曲”导入文件或文件夹；用“Wi-Fi 同步”显示二维码和连接码。
 
-```text
-D:\Projects\music_sync_player\release\android\music_sync_player_v1_debug.apk
-```
+Windows 本地播放依赖 `ffplay`。目标机器没有可用 `ffplay` 时，导入、歌单和同步仍可用，但 Windows 端无法播放本地歌曲。
 
-The `release/` directory is ignored by Git and should not be committed.
+## 安装 Android
 
-## Completed V1 Features
+1. 把 `release\android\music_sync_player_v1_debug.apk` 复制到手机。
+2. 在 Android 系统中允许安装本地 APK。
+3. 安装后打开“壹加音乐”。
 
-- Windows local music library.
-- Windows audio file import.
-- Windows folder import.
-- Supported import formats: MP3, FLAC, M4A, WAV.
-- Conservative filename handling for numeric, encoded,乱码, or meaningless names.
-- Pending-review names such as `未命名音频 001/002/003...`.
-- Duplicate audio detection by file hash.
-- Windows playlist creation, rename, delete, add song, and remove song.
-- Windows search for songs and playlists.
-- Windows local playback for generated MP3, FLAC, M4A, and WAV test files.
-- Windows player-focused startup screen: the default page is the music library, while adding songs and Wi-Fi sync are separate pages.
-- Windows bottom playback bar with current song details, play/pause, stop, elapsed time, duration, and draggable progress control.
-- Windows Wi-Fi sync mode with connection code and QR payload.
-- Windows sync server endpoints for connection, playlist list, playlist manifest, and audio download.
-- Android QR scan connection.
-- Android manual QR payload paste fallback.
-- Android whole-playlist sync from Windows to local app storage.
-- Android local database write for synced songs and playlists.
-- Android synced-only library display.
-- Android synced-only search.
-- Android local cache deletion without modifying the Windows library.
-- Android offline playback of locally synced files.
-- Android playback progress control and clearer sync results, including local-song count and the first failure reason when a song cannot be synced.
+## Wi-Fi 同步
 
-## How To Start Windows
+1. 让 Windows 电脑和 Android 手机使用同一 Wi-Fi。
+2. Windows 打开“Wi-Fi 同步”。
+3. Android 打开“同步音乐”，优先扫描 Windows 二维码。
+4. 扫码失败时展开手动连接，粘贴二维码载荷。
+5. 连接后选择整张歌单同步。Android 完成后会自动刷新音乐库并显示本机歌曲数量。
 
-1. Open:
+## 自动验证
 
-   ```text
-   D:\Projects\music_sync_player\release\windows\MusicSyncPlayer\
-   ```
+- Windows：`flutter analyze`、`flutter test`、`flutter build windows`。
+- Android：`flutter analyze`、`flutter test`、`flutter build apk --debug`。
+- 项目内生成 MP3、FLAC、M4A、WAV 的导入、待整理命名、重复检测和 Windows 播放探测。
+- Windows 同步服务与 Android 同步客户端的自动测试。
 
-2. Double-click `YijiaMusic.exe`.
-3. The default `音乐库` page is for searching and playing music.
-4. Open `添加歌曲` when you want to import audio files or a folder.
-5. Create a playlist and add songs from the music library.
-6. Open `Wi-Fi 同步` to show the QR code and connection code.
+## 仍需真机确认
 
-The bottom playback bar supports play/pause, stop, elapsed time, and dragging the progress control. Windows playback seeks by restarting `ffplay` from the chosen position, so a short restart is expected after dragging.
+- Windows 真实文件与文件夹选择器。
+- Android 相机权限和扫描 Windows 二维码。
+- 同一 Wi-Fi 下 Android 连接、整张歌单下载和同步结果显示。
+- 关闭 Windows 同步模式或断网后的 Android 离线播放。
 
-Note: Windows local playback currently uses `ffplay` from the local machine to support MP3, FLAC, M4A, and WAV. If another machine does not have `ffplay` on PATH, import, playlist management, and sync can still work, but Windows-side playback needs a playback backend available on that machine.
+## V1 范围外
 
-## How To Install Android APK
-
-1. Copy this APK to the Android phone:
-
-   ```text
-   D:\Projects\music_sync_player\release\android\music_sync_player_v1_debug.apk
-   ```
-
-2. Allow local APK installation on the phone.
-3. Install and open the app.
-
-## How To Sync Over Wi-Fi
-
-1. Keep the Windows computer and Android phone on the same Wi-Fi.
-2. Open sync mode on Windows.
-3. On Android, tap `扫码` and scan the Windows QR code.
-4. If scanning fails, paste the Windows QR payload into the Android text box and tap `连接电脑端`.
-5. Choose a playlist and sync the whole playlist.
-6. After sync, Android shows only locally synced songs and playlists.
-7. Android can play already-synced songs from local storage after the Windows sync mode is closed or the network is unavailable.
-
-## Automated Validation Passed
-
-- `apps\windows_app`: `flutter analyze`
-- `apps\windows_app`: `flutter test`
-- `apps\windows_app`: `flutter build windows`
-- `apps\android_app`: `flutter analyze`
-- `apps\android_app`: `flutter test`
-- `apps\android_app`: `flutter build apk --debug`
-- Generated test audio import: MP3, FLAC, M4A, WAV.
-- Generated test audio playback probe: MP3, FLAC, M4A, WAV.
-- Duplicate file handling.
-- Pending-review filename handling.
-- Windows sync service tests.
-- Android sync client tests.
-
-## Latest Windows Player Improvements
-
-- Unified the Windows typography with Microsoft YaHei UI and a consistent title/body/button weight scale.
-- Moved previous, play/pause, and next controls to the center of the bottom player bar.
-- Added playback queue controls: play next, add to queue, inspect the queue, drag to reorder, remove upcoming songs, and clear upcoming songs.
-- Added sequence, repeat-all, repeat-one, and shuffle playback modes.
-- Added keyboard controls: Ctrl+Space, Ctrl+Left/Right, and Alt+Left/Right.
-- Verified this Windows update with `flutter analyze`, `flutter test`, and `flutter build windows`.
-
-## Windows Visual Refresh
-
-- Reworked the initial graphite-and-berry visual refresh after usability feedback: the Windows UI now uses a brighter fog-green layered palette with high-contrast controls.
-- Kept the listening view focused: import and Wi-Fi sync remain separate pages, while search, songs, playlists, and playback stay on the main library page.
-- Restyled navigation, search, lists, playlist panels, import, sync, and the full-width bottom player bar with restrained borders and spacing.
-- Updated the queue to appear as a right-aligned panel rather than a centered utility dialog.
-- The primary control color is forest green, with a white play icon and darker standard icons to keep every control legible.
-- Added a widget test that guards the light theme and forest-green primary color.
-- Verified this visual refresh with `flutter analyze`, `flutter test`, and `flutter build windows`.
-
-## Yijia Music Branding
-
-- Added the approved green folded music mark to the Windows navigation header and compact navigation state.
-- Embedded the same mark in the Windows executable icon, with the native window title and product metadata updated to `壹加音乐`.
-- Verified this branding update with Windows `flutter analyze`, `flutter test`, and `flutter build windows`.
-
-## Windows Branding Fix
-
-- Fixed the native window title so `壹加音乐` renders correctly regardless of the Windows system code page.
-- Performed a clean Windows rebuild and inspected the generated EXE icon directly to confirm it contains the approved green music mark.
-- Renamed the delivered Windows entry point to `YijiaMusic.exe` so Explorer treats it as the branded application rather than reusing the old `windows_app.exe` icon cache.
-
-## Android Player And Sync Refresh
-
-- Rebuilt the Android app around Library, Playlists, and Sync Music bottom navigation, keeping only synced songs and playlists in the local views.
-- After a successful playlist sync, the app clears any active search, refreshes the local database views, selects the synced playlist, and returns to the Library tab with the actual local-song count.
-- Added a compact player and a full player panel with play or pause, previous, next, and seek controls. Local-cache deletion now asks for confirmation and leaves the Windows library untouched.
-- Updated the Android app label and launcher icons to the Yijia Music brand. Verified with Android `flutter analyze`, `flutter test`, and `flutter build apk --debug`.
-
-## Still Needs Manual Confirmation
-
-- Windows real file picker and folder picker interaction.
-- Android camera permission dialog on a real phone.
-- Android real QR scan against the Windows QR code.
-- Android phone reaching the Windows sync service on the same Wi-Fi.
-- Android offline playback after closing Windows sync mode or disconnecting Wi-Fi.
-
-## Out Of Scope For V1
-
-V1 does not include cloud sync, public remote streaming, USB sync, Bluetooth sync, covers, lyrics, recommendation algorithms, comments/social features, multi-user login, Android playlist editing, Android music import, or Android sync back to Windows.
+云同步、公网远程播放、USB、蓝牙、封面、歌词、推荐、社交、多用户登录、Android 编辑歌单、Android 导入音乐和 Android 同步回电脑均不在 V1 内。

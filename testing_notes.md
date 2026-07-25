@@ -1,4 +1,4 @@
-# Phase 7 Testing Notes
+# 自动测试与人工验收说明
 
 ## Generated Sample Status
 
@@ -42,6 +42,10 @@ Passed with generated samples:
 - Windows sync server connect, playlist list, manifest, and file download.
 - Android sync client connect, playlist fetch, whole-playlist sync, local file
   write, local database write, and synced-only visibility.
+- Android music-library, playlist and sync navigation entry; scan-first flow and
+  manual-paste fallback UI.
+- Android local-player controls: play/pause state, previous/next queue actions
+  and seek wiring are covered by application-level tests and build validation.
 
 Builds passed:
 
@@ -107,7 +111,7 @@ running Windows app and an Android device:
 - Close Windows sync mode or disconnect Wi-Fi and confirm Android still plays
   already-synced files offline.
 
-## Current Automated Coverage
+## 当前自动覆盖
 
 Automated tests currently cover:
 

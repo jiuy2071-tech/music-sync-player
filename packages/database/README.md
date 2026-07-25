@@ -1,39 +1,12 @@
-<!--
-This README describes the package. If you publish this package to pub.dev,
-this README's contents appear on the landing page for your package.
+# music_database
 
-For information about how to write a good package README, see the guide for
-[writing package pages](https://dart.dev/tools/pub/writing-package-pages).
+壹加音乐的 SQLite 访问层。
 
-For general information about developing packages, see the Dart guide for
-[creating packages](https://dart.dev/guides/libraries/create-packages)
-and the Flutter guide for
-[developing packages and plugins](https://flutter.dev/to/develop-packages).
--->
+创建并维护 `songs`、`playlists`、`playlist_items`、`sync_cache`；提供歌曲、歌单、同步缓存和搜索仓库。Android 搜索可限制为 `synced` 缓存，确保不会显示尚未下载的歌曲。
 
-TODO: Put a short description of the package here that helps potential users
-know whether this package might be useful for them.
+运行检查：
 
-## Features
-
-TODO: List what your package can do. Maybe include images, gifs, or videos.
-
-## Getting started
-
-TODO: List prerequisites and provide or point to information on how to
-start using the package.
-
-## Usage
-
-TODO: Include short and useful examples for package users. Add longer examples
-to `/example` folder.
-
-```dart
-const like = 'sample';
+```powershell
+dart analyze
+dart test
 ```
-
-## Additional information
-
-TODO: Tell users more about the package: where to find more information, how to
-contribute to the package, how to file issues, what response they can expect
-from the package authors, and more.

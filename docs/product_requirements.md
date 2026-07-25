@@ -390,10 +390,10 @@ V1 不仅要完成源码实现，还需要提供用户可以实际安装和启�
 ```text
 release/
   android/
-    music_sync_player_v1.apk
+    music_sync_player_v1_debug.apk
   windows/
     MusicSyncPlayer/
-      MusicSyncPlayer.exe
+      YijiaMusic.exe
       其他运行所需文件
   RELEASE_NOTES.md
 ```
@@ -415,4 +415,3 @@ V1 产品验收时，除了验证“导入音乐—建歌单—扫码同步—�
 - Windows exe 可以双击启动；
 - Windows 端不是只能通过源码开发环境启动；
 - 交付说明足够清楚，用户能根据说明完成安装和启动。
-
