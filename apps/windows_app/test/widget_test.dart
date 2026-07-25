@@ -58,4 +58,27 @@ void main() {
     expect(find.text('导入文件夹'), findsOneWidget);
     expect(find.textContaining('待整理音频'), findsOneWidget);
   });
+
+  testWidgets('opens the Wi-Fi sync page and shows the copy action', (
+    tester,
+  ) async {
+    final database = MusicDatabase.memory();
+    addTearDown(database.close);
+
+    await tester.pumpWidget(
+      WindowsMusicApp(
+        database: database,
+        library: const MusicLibraryLocation(
+          rootPath: r'D:\OnePlusMusic\Library',
+        ),
+      ),
+    );
+
+    await tester.tap(find.byTooltip('Wi-Fi 同步'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('开启同步模式'), findsOneWidget);
+    expect(find.text('复制连接信息'), findsOneWidget);
+  });
 }
