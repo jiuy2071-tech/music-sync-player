@@ -29,6 +29,11 @@
 - 新增空间不足提前停止和服务器临时失败后重试成功的自动测试。
 - Android `flutter analyze`、完整 `flutter test` 和 `flutter build apk --debug` 已通过；新的 APK 已更新到本地交付目录。
 - Windows 权威歌单对账、孤儿缓存清理和真机断网回归仍在后续 P0 清单中。
+- Windows `/playlists` 增加权威清单 SHA-256 和每张歌单内容版本；manifest 返回对应版本，Android 会拒绝同步期间发生变化的清单。
+- SQLite 增加 `synced_playlists` 快照表，空歌单同步后可正常显示，并兼容补录旧数据库中的已有非空歌单。
+- Android 连接后会移除 Windows 已删除的本地歌单；孤儿清理按 `playlist_items` 引用判断，共用歌曲保留，最后引用消失后才删除。
+- 孤儿音频先移动到 APP 私有临时回收目录，数据库删除失败会恢复文件。
+- Windows 与 Android 的完整 `flutter analyze`、`flutter test` 和对应构建再次通过；两个固定交付位置均已覆盖为本次版本。
 
 ## 当前交付
 

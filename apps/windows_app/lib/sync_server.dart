@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:crypto/crypto.dart';
 import 'package:music_core/music_core.dart';
 import 'package:music_database/music_database.dart';
 import 'package:music_sync_protocol/music_sync_protocol.dart';
@@ -58,11 +59,10 @@ class WindowsSyncServer {
         return;
       }
       if (!_isAuthorized(request)) {
-        await _writeJson(
-          request,
-          {'ok': false, 'message': '连接码无效或同步模式已关闭'},
-          statusCode: HttpStatus.forbidden,
-        );
+        await _writeJson(request, {
+          'ok': false,
+          'message': '连接码无效或同步模式已关闭',
+        }, statusCode: HttpStatus.forbidden);
         return;
       }
       if (request.method == 'GET' && request.uri.path == '/playlists') {
@@ -83,17 +83,15 @@ class WindowsSyncServer {
         await _writeSongFile(request, segments[1]);
         return;
       }
-      await _writeJson(
-        request,
-        {'ok': false, 'message': '接口不存在'},
-        statusCode: HttpStatus.notFound,
-      );
+      await _writeJson(request, {
+        'ok': false,
+        'message': '接口不存在',
+      }, statusCode: HttpStatus.notFound);
     } catch (error) {
-      await _writeJson(
-        request,
-        {'ok': false, 'message': error.toString()},
-        statusCode: HttpStatus.internalServerError,
-      );
+      await _writeJson(request, {
+        'ok': false,
+        'message': error.toString(),
+      }, statusCode: HttpStatus.internalServerError);
     }
   }
 
@@ -134,16 +132,17 @@ class WindowsSyncServer {
 
   Future<void> _writePlaylists(HttpRequest request) async {
     final playlists = database.playlists.all();
+    final entries = [
+      for (final playlist in playlists)
+        _playlistCatalogEntry(
+          playlist,
+          database.playlists.songsForPlaylist(playlist.id),
+        ),
+    ];
     await _writeJson(request, {
       'ok': true,
-      'playlists': playlists.map((playlist) {
-        return {
-          'id': playlist.id,
-          'name': playlist.name,
-          'sort_order': playlist.sortOrder,
-          'song_count': database.playlists.songsForPlaylist(playlist.id).length,
-        };
-      }).toList(),
+      'catalog_version': _hashJson(entries),
+      'playlists': entries,
     });
   }
 
@@ -153,17 +152,17 @@ class WindowsSyncServer {
   ) async {
     final playlist = database.playlists.findById(playlistId);
     if (playlist == null) {
-      await _writeJson(
-        request,
-        {'ok': false, 'message': '歌单不存在'},
-        statusCode: HttpStatus.notFound,
-      );
+      await _writeJson(request, {
+        'ok': false,
+        'message': '歌单不存在',
+      }, statusCode: HttpStatus.notFound);
       return;
     }
 
     final songs = database.playlists.songsForPlaylist(playlistId);
     await _writeJson(request, {
       'ok': true,
+      'playlist_version': _playlistVersion(playlist, songs),
       'playlist': playlist.toMap(),
       'songs': [
         for (var index = 0; index < songs.length; index++)
@@ -179,21 +178,19 @@ class WindowsSyncServer {
   Future<void> _writeSongFile(HttpRequest request, String songId) async {
     final song = database.songs.findById(songId);
     if (song == null) {
-      await _writeJson(
-        request,
-        {'ok': false, 'message': '歌曲不存在'},
-        statusCode: HttpStatus.notFound,
-      );
+      await _writeJson(request, {
+        'ok': false,
+        'message': '歌曲不存在',
+      }, statusCode: HttpStatus.notFound);
       return;
     }
 
     final file = File(song.localPath);
     if (!await file.exists()) {
-      await _writeJson(
-        request,
-        {'ok': false, 'message': '本地音频文件不存在'},
-        statusCode: HttpStatus.notFound,
-      );
+      await _writeJson(request, {
+        'ok': false,
+        'message': '本地音频文件不存在',
+      }, statusCode: HttpStatus.notFound);
       return;
     }
 
@@ -213,10 +210,12 @@ class WindowsSyncServer {
   String _downloadUrl(String songId) {
     final session = _session!;
     final encodedSongId = Uri.encodeComponent(songId);
-    final query = Uri(queryParameters: {
-      'session_id': session.sessionId,
-      'connect_code': session.connectCode,
-    }).query;
+    final query = Uri(
+      queryParameters: {
+        'session_id': session.sessionId,
+        'connect_code': session.connectCode,
+      },
+    ).query;
     return 'http://${session.host}:${session.port}/songs/$encodedSongId/file?$query';
   }
 
@@ -234,6 +233,37 @@ class WindowsSyncServer {
       'display_name_source': song.displayNameSource.value,
       'is_pending_review': song.isPendingReview,
     };
+  }
+
+  Map<String, Object?> _playlistCatalogEntry(
+    Playlist playlist,
+    List<Song> songs,
+  ) {
+    return {
+      'id': playlist.id,
+      'name': playlist.name,
+      'sort_order': playlist.sortOrder,
+      'song_count': songs.length,
+      'version': _playlistVersion(playlist, songs),
+    };
+  }
+
+  String _playlistVersion(Playlist playlist, List<Song> songs) {
+    return _hashJson({
+      'playlist': playlist.toMap(),
+      'songs': [
+        for (var index = 0; index < songs.length; index++)
+          {
+            'id': songs[index].id,
+            'file_hash': songs[index].fileHash,
+            'sort_order': index,
+          },
+      ],
+    });
+  }
+
+  String _hashJson(Object value) {
+    return sha256.convert(utf8.encode(jsonEncode(value))).toString();
   }
 
   Future<void> _writeJson(

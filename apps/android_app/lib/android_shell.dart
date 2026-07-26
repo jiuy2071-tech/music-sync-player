@@ -226,10 +226,24 @@ class _AndroidHomePageState extends State<_AndroidHomePage> {
     try {
       final payload = SyncQrPayload.fromJsonText(payloadText);
       await _syncClient.connect(payload);
-      final playlists = await _syncClient.fetchPlaylists(payload);
+      final catalog = await _syncClient.fetchPlaylistCatalog(payload);
+      final reconcile = await _syncClient.reconcileAuthoritativeCatalog(
+        catalog: catalog,
+        database: widget.database,
+        library: widget.library,
+      );
+      final playlists = catalog.playlists;
       if (!mounted) {
         return;
       }
+      _reloadLocal();
+      final reconcileMessage = reconcile.removedPlaylistCount == 0
+          ? ''
+          : ' 已移除电脑端不存在的 ${reconcile.removedPlaylistCount} 张旧歌单'
+                '和 ${reconcile.removedSongCount} 首孤立缓存。';
+      final cleanupWarning = reconcile.cleanupFailureMessages.isEmpty
+          ? ''
+          : ' 有 ${reconcile.cleanupFailureMessages.length} 个缓存待下次清理。';
       setState(() {
         _payloadController.text = payloadText;
         _connectedPayload = payload;
@@ -237,7 +251,9 @@ class _AndroidHomePageState extends State<_AndroidHomePage> {
         _busy = false;
         _status = playlists.isEmpty
             ? '已连接电脑端，但电脑端还没有可同步歌单。'
-            : '已连接电脑端，找到 ${playlists.length} 张歌单。';
+                  '$reconcileMessage$cleanupWarning'
+            : '已连接电脑端，找到 ${playlists.length} 张歌单。'
+                  '$reconcileMessage$cleanupWarning';
       });
     } catch (error) {
       if (mounted) {

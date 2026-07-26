@@ -19,6 +19,7 @@ class RemotePlaylist {
     required this.name,
     required this.sortOrder,
     required this.songCount,
+    required this.version,
   });
 
   factory RemotePlaylist.fromJson(Map<String, Object?> json) {
@@ -27,6 +28,7 @@ class RemotePlaylist {
       name: json['name']! as String,
       sortOrder: json['sort_order']! as int,
       songCount: json['song_count']! as int,
+      version: json['version']! as String,
     );
   }
 
@@ -34,6 +36,26 @@ class RemotePlaylist {
   final String name;
   final int sortOrder;
   final int songCount;
+  final String version;
+}
+
+class RemotePlaylistCatalog {
+  const RemotePlaylistCatalog({required this.version, required this.playlists});
+
+  final String version;
+  final List<RemotePlaylist> playlists;
+}
+
+class CatalogReconcileResult {
+  const CatalogReconcileResult({
+    required this.removedPlaylistCount,
+    required this.removedSongCount,
+    required this.cleanupFailureMessages,
+  });
+
+  final int removedPlaylistCount;
+  final int removedSongCount;
+  final List<String> cleanupFailureMessages;
 }
 
 class PlaylistSyncResult {
@@ -85,7 +107,9 @@ class AndroidSyncClient {
     }
   }
 
-  Future<List<RemotePlaylist>> fetchPlaylists(SyncQrPayload payload) async {
+  Future<RemotePlaylistCatalog> fetchPlaylistCatalog(
+    SyncQrPayload payload,
+  ) async {
     final response = await _getJson(_uri(payload, '/playlists', auth: true));
     if (response['ok'] != true) {
       throw AppError(
@@ -94,10 +118,46 @@ class AndroidSyncClient {
       );
     }
     final playlists = response['playlists']! as List;
-    return playlists
-        .cast<Map<String, Object?>>()
-        .map(RemotePlaylist.fromJson)
-        .toList();
+    return RemotePlaylistCatalog(
+      version: response['catalog_version']! as String,
+      playlists: playlists
+          .cast<Map<String, Object?>>()
+          .map(RemotePlaylist.fromJson)
+          .toList(),
+    );
+  }
+
+  Future<List<RemotePlaylist>> fetchPlaylists(SyncQrPayload payload) async {
+    return (await fetchPlaylistCatalog(payload)).playlists;
+  }
+
+  Future<CatalogReconcileResult> reconcileAuthoritativeCatalog({
+    required RemotePlaylistCatalog catalog,
+    required MusicDatabase database,
+    required AndroidMusicLibraryLocation library,
+  }) async {
+    _requireVersion(catalog.version, 'catalog');
+    final remoteIds = <String>{};
+    for (final playlist in catalog.playlists) {
+      _requireSafeId(playlist.id, 'playlist');
+      _requireVersion(playlist.version, 'playlist');
+      remoteIds.add(playlist.id);
+    }
+    final removedPlaylistIds = database.sync.syncedPlaylistIds()
+      ..removeWhere(remoteIds.contains);
+    if (removedPlaylistIds.isNotEmpty) {
+      await database.transaction<void>(() async {
+        for (final playlistId in removedPlaylistIds) {
+          database.playlists.deletePlaylist(playlistId);
+        }
+      });
+    }
+    final cleanup = await _cleanupOrphanedSongs(database, library);
+    return CatalogReconcileResult(
+      removedPlaylistCount: removedPlaylistIds.length,
+      removedSongCount: cleanup.removedCount,
+      cleanupFailureMessages: cleanup.failureMessages,
+    );
   }
 
   Future<PlaylistSyncResult> syncPlaylist({
@@ -107,6 +167,7 @@ class AndroidSyncClient {
     required AndroidMusicLibraryLocation library,
   }) async {
     _requireSafeId(remotePlaylist.id, 'playlist');
+    _requireVersion(remotePlaylist.version, 'playlist');
     final manifest = await _getJson(
       _uri(payload, '/playlists/${remotePlaylist.id}/manifest', auth: true),
     );
@@ -121,6 +182,11 @@ class AndroidSyncClient {
     final playlist = Playlist.fromMap(playlistJson);
     if (playlist.id != remotePlaylist.id) {
       throw const AppError('sync_manifest_invalid', '同步清单中的歌单与所选歌单不一致');
+    }
+    final playlistVersion = manifest['playlist_version']! as String;
+    _requireVersion(playlistVersion, 'playlist');
+    if (playlistVersion != remotePlaylist.version) {
+      throw const AppError('sync_manifest_stale', '电脑端歌单在同步期间发生变化，请刷新后重试');
     }
 
     final songJsonList = (manifest['songs']! as List)
@@ -275,6 +341,11 @@ class AndroidSyncClient {
             database.playlists.addSong(item: prepared.item);
             database.sync.upsertCacheEntry(prepared.cache);
           }
+          database.sync.upsertPlaylistSnapshot(
+            playlistId: playlist.id,
+            sourceVersion: playlistVersion,
+            syncedAt: DateTime.now().toUtc(),
+          );
           for (var index = 0; index < preparedSongs.length; index++) {
             final prepared = preparedSongs[index];
             final stagedFile = prepared.stagedFile;
@@ -305,16 +376,17 @@ class AndroidSyncClient {
         Error.throwWithStackTrace(error, stackTrace);
       }
 
+      final cleanup = await _cleanupOrphanedSongs(database, library);
       return PlaylistSyncResult(
         downloadedCount: preparedSongs
             .where((prepared) => prepared.downloadUri != null)
             .length,
         skippedCount: skipped,
-        failedCount: 0,
+        failedCount: cleanup.failureMessages.length,
         localSongCount: database.search
             .searchSongs('', syncedOnly: true)
             .length,
-        failureMessages: const [],
+        failureMessages: cleanup.failureMessages,
       );
     } finally {
       if (!preserveStaging) {
@@ -342,6 +414,66 @@ class AndroidSyncClient {
             '当前可用 ${_formatMegabytes(availableBytes)}',
       );
     }
+  }
+
+  Future<_OrphanCleanupResult> _cleanupOrphanedSongs(
+    MusicDatabase database,
+    AndroidMusicLibraryLocation library,
+  ) async {
+    final orphanedSongs = database.sync.unreferencedSyncedSongs();
+    if (orphanedSongs.isEmpty) {
+      return const _OrphanCleanupResult(removedCount: 0, failureMessages: []);
+    }
+
+    final trashDirectory = Directory(p.join(library.rootPath, '.sync_trash'));
+    var removedCount = 0;
+    final failures = <String>[];
+    for (var index = 0; index < orphanedSongs.length; index++) {
+      final song = orphanedSongs[index];
+      final sourceFile = File(song.localPath);
+      if (!_isPathWithin(library.audioPath, sourceFile.path)) {
+        database.sync.markDeleted(song.id, DateTime.now().toUtc());
+        failures.add('${song.title}：缓存路径不安全，未删除磁盘文件');
+        continue;
+      }
+
+      File? trashFile;
+      try {
+        if (await sourceFile.exists()) {
+          await trashDirectory.create(recursive: true);
+          trashFile = File(
+            p.join(
+              trashDirectory.path,
+              '${DateTime.now().microsecondsSinceEpoch}_$index.trash',
+            ),
+          );
+          await sourceFile.rename(trashFile.path);
+        }
+        try {
+          await database.transaction<void>(() async {
+            database.songs.deleteById(song.id);
+          });
+        } catch (_) {
+          if (trashFile != null && await trashFile.exists()) {
+            await trashFile.rename(sourceFile.path);
+          }
+          rethrow;
+        }
+        if (trashFile != null && await trashFile.exists()) {
+          await trashFile.delete();
+        }
+        removedCount++;
+      } catch (error) {
+        failures.add('${song.title}：$error');
+      }
+    }
+    if (await trashDirectory.exists() && await trashDirectory.list().isEmpty) {
+      await trashDirectory.delete();
+    }
+    return _OrphanCleanupResult(
+      removedCount: removedCount,
+      failureMessages: failures,
+    );
   }
 
   Future<void> dispose() async {
@@ -488,6 +620,16 @@ class _AppliedReplacement {
   final File? backupFile;
 }
 
+class _OrphanCleanupResult {
+  const _OrphanCleanupResult({
+    required this.removedCount,
+    required this.failureMessages,
+  });
+
+  final int removedCount;
+  final List<String> failureMessages;
+}
+
 Future<void> _replaceFile({
   required File stagedFile,
   required File targetFile,
@@ -529,12 +671,22 @@ void _requireSafeId(String value, String field) {
   }
 }
 
+void _requireVersion(String value, String field) {
+  if (!RegExp(r'^[a-fA-F0-9]{64}$').hasMatch(value)) {
+    throw AppError('sync_manifest_invalid', '同步清单中的 $field 版本无效');
+  }
+}
+
 void _requirePathWithin(String parentPath, String childPath) {
-  final normalizedParent = p.normalize(p.absolute(parentPath));
-  final normalizedChild = p.normalize(p.absolute(childPath));
-  if (!p.isWithin(normalizedParent, normalizedChild)) {
+  if (!_isPathWithin(parentPath, childPath)) {
     throw const AppError('sync_path_unsafe', '同步文件路径超出 APP 私有音乐目录');
   }
+}
+
+bool _isPathWithin(String parentPath, String childPath) {
+  final normalizedParent = p.normalize(p.absolute(parentPath));
+  final normalizedChild = p.normalize(p.absolute(childPath));
+  return p.isWithin(normalizedParent, normalizedChild);
 }
 
 void _requireSuccessfulResponse(int statusCode, String responseBody) {

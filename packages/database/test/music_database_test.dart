@@ -152,6 +152,53 @@ void main() {
     expect(database.playlists.findById(playlist.id)?.name, 'Before');
     expect(database.songs.findById('song-1'), isNull);
   });
+
+  test('synced empty playlist remains visible on Android', () {
+    final playlist = _playlist(id: 'playlist-empty', name: 'Empty playlist');
+    database.playlists.upsert(playlist);
+    database.sync.upsertPlaylistSnapshot(
+      playlistId: playlist.id,
+      sourceVersion: 'version-empty',
+      syncedAt: DateTime.utc(2026, 7, 26),
+    );
+
+    final result = database.search.searchPlaylists('', syncedOnly: true);
+
+    expect(result, hasLength(1));
+    expect(result.single.id, playlist.id);
+    expect(database.sync.playlistSourceVersion(playlist.id), 'version-empty');
+  });
+
+  test('finds synced songs only after all playlist references are removed', () {
+    final song = _song(id: 'shared-song', title: 'Shared Song');
+    final first = _playlist(id: 'playlist-1', name: 'First');
+    final second = _playlist(id: 'playlist-2', name: 'Second');
+    database.songs.upsert(song);
+    database.playlists.upsert(first);
+    database.playlists.upsert(second);
+    database.playlists.addSong(
+      item: _playlistItem(id: 'item-1', playlistId: first.id, songId: song.id),
+    );
+    database.playlists.addSong(
+      item: _playlistItem(id: 'item-2', playlistId: second.id, songId: song.id),
+    );
+    database.sync.upsertCacheEntry(
+      SyncCacheEntry(
+        id: 'cache-shared-song',
+        songId: song.id,
+        localCachePath: song.localPath,
+        fileHash: song.fileHash,
+        status: SyncCacheStatus.synced,
+        syncedAt: DateTime.utc(2026, 7, 26),
+      ),
+    );
+
+    database.playlists.deletePlaylist(first.id);
+    expect(database.sync.unreferencedSyncedSongs(), isEmpty);
+
+    database.playlists.deletePlaylist(second.id);
+    expect(database.sync.unreferencedSyncedSongs().single.id, song.id);
+  });
 }
 
 Song _song({required String id, required String title}) {

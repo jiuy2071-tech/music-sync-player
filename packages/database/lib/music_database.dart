@@ -31,7 +31,9 @@ class MusicDatabase {
     db.execute(_createPlaylistsTable);
     db.execute(_createPlaylistItemsTable);
     db.execute(_createSyncCacheTable);
+    db.execute(_createSyncedPlaylistsTable);
     db.execute(_createIndexes);
+    db.execute(_bootstrapSyncedPlaylists);
   }
 
   Future<T> transaction<T>(Future<T> Function() action) async {
@@ -282,6 +284,58 @@ class SyncRepository {
       [SyncCacheStatus.deleted.value, deletedAt.toIso8601String(), songId],
     );
   }
+
+  void upsertPlaylistSnapshot({
+    required String playlistId,
+    required String sourceVersion,
+    required DateTime syncedAt,
+  }) {
+    _db.execute(
+      '''
+      INSERT INTO synced_playlists (playlist_id, source_version, synced_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(playlist_id) DO UPDATE SET
+        source_version = excluded.source_version,
+        synced_at = excluded.synced_at
+      ''',
+      [playlistId, sourceVersion, syncedAt.toIso8601String()],
+    );
+  }
+
+  List<String> syncedPlaylistIds() {
+    final result = _db.select(
+      'SELECT playlist_id FROM synced_playlists ORDER BY playlist_id',
+    );
+    return result.map((row) => row['playlist_id']! as String).toList();
+  }
+
+  String? playlistSourceVersion(String playlistId) {
+    final result = _db.select(
+      'SELECT source_version FROM synced_playlists WHERE playlist_id = ?',
+      [playlistId],
+    );
+    if (result.isEmpty) {
+      return null;
+    }
+    return result.first['source_version']! as String;
+  }
+
+  List<Song> unreferencedSyncedSongs() {
+    final result = _db.select(
+      '''
+      SELECT songs.* FROM songs
+      INNER JOIN sync_cache ON sync_cache.song_id = songs.id
+      WHERE sync_cache.status = ?
+        AND NOT EXISTS (
+          SELECT 1 FROM playlist_items
+          WHERE playlist_items.song_id = songs.id
+        )
+      ORDER BY songs.id
+      ''',
+      [SyncCacheStatus.synced.value],
+    );
+    return result.map(Song.fromMap).toList();
+  }
 }
 
 class SearchRepository {
@@ -323,11 +377,10 @@ class SearchRepository {
     final pattern = _likePattern(keyword);
     final sql = syncedOnly
         ? '''
-          SELECT DISTINCT playlists.* FROM playlists
-          INNER JOIN playlist_items ON playlist_items.playlist_id = playlists.id
-          INNER JOIN sync_cache ON sync_cache.song_id = playlist_items.song_id
-          WHERE sync_cache.status = ?
-            AND playlists.name LIKE ?
+          SELECT playlists.* FROM playlists
+          INNER JOIN synced_playlists
+            ON synced_playlists.playlist_id = playlists.id
+          WHERE playlists.name LIKE ?
           ORDER BY playlists.sort_order, playlists.name
           '''
         : '''
@@ -335,9 +388,7 @@ class SearchRepository {
           WHERE name LIKE ?
           ORDER BY sort_order, name
           ''';
-    final args = syncedOnly
-        ? [SyncCacheStatus.synced.value, pattern]
-        : [pattern];
+    final args = [pattern];
     final result = _db.select(sql, args);
     return result.map(Playlist.fromMap).toList();
   }
@@ -423,6 +474,29 @@ CREATE TABLE IF NOT EXISTS sync_cache (
 );
 ''';
 
+const _createSyncedPlaylistsTable = '''
+CREATE TABLE IF NOT EXISTS synced_playlists (
+  playlist_id TEXT PRIMARY KEY,
+  source_version TEXT NOT NULL,
+  synced_at TEXT NOT NULL,
+  FOREIGN KEY (playlist_id) REFERENCES playlists(id) ON DELETE CASCADE
+);
+''';
+
+const _bootstrapSyncedPlaylists = '''
+INSERT OR IGNORE INTO synced_playlists (
+  playlist_id, source_version, synced_at
+)
+SELECT
+  playlist_items.playlist_id,
+  'legacy',
+  MAX(sync_cache.synced_at)
+FROM playlist_items
+INNER JOIN sync_cache ON sync_cache.song_id = playlist_items.song_id
+WHERE sync_cache.status = 'synced'
+GROUP BY playlist_items.playlist_id;
+''';
+
 const _createIndexes = '''
 CREATE UNIQUE INDEX IF NOT EXISTS idx_songs_file_hash ON songs(file_hash);
 CREATE INDEX IF NOT EXISTS idx_songs_title ON songs(title);
@@ -432,4 +506,6 @@ CREATE INDEX IF NOT EXISTS idx_playlist_items_playlist
   ON playlist_items(playlist_id, sort_order);
 CREATE INDEX IF NOT EXISTS idx_sync_cache_song ON sync_cache(song_id);
 CREATE INDEX IF NOT EXISTS idx_sync_cache_status ON sync_cache(status);
+CREATE INDEX IF NOT EXISTS idx_synced_playlists_synced_at
+  ON synced_playlists(synced_at);
 ''';

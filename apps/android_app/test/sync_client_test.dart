@@ -10,6 +10,11 @@ import 'package:music_database/music_database.dart';
 import 'package:music_sync_protocol/music_sync_protocol.dart';
 import 'package:path/path.dart' as p;
 
+const _playlistVersion =
+    '1111111111111111111111111111111111111111111111111111111111111111';
+const _catalogVersion =
+    '2222222222222222222222222222222222222222222222222222222222222222';
+
 void main() {
   late HttpServer server;
   late Directory tempDir;
@@ -58,12 +63,14 @@ void main() {
       if (request.method == 'GET' && request.uri.path == '/playlists') {
         await _writeJson(request, {
           'ok': true,
+          'catalog_version': _catalogVersion,
           'playlists': [
             {
               'id': 'playlist-1',
               'name': manifestPlaylistName,
               'sort_order': 0,
               'song_count': manifestSongs().length,
+              'version': _playlistVersion,
             },
           ],
         });
@@ -73,6 +80,7 @@ void main() {
           request.uri.path == '/playlists/playlist-1/manifest') {
         await _writeJson(request, {
           'ok': true,
+          'playlist_version': _playlistVersion,
           'playlist': _playlist(
             id: 'playlist-1',
             name: manifestPlaylistName,
@@ -345,6 +353,92 @@ void main() {
     expect(downloadRequestCount, 2);
     expect(database.search.searchSongs('', syncedOnly: true), hasLength(1));
   });
+
+  test('syncing an empty playlist keeps it visible locally', () async {
+    final library = AndroidMusicLibraryLocation(rootPath: tempDir.path);
+    await library.ensureReady();
+    manifestSongs = () => [];
+
+    final result = await _syncRemotePlaylist(
+      client: client,
+      payload: payload,
+      database: database,
+      library: library,
+    );
+
+    expect(result.downloadedCount, 0);
+    expect(database.search.searchPlaylists('', syncedOnly: true), hasLength(1));
+    expect(database.playlists.songsForPlaylist('playlist-1'), isEmpty);
+    expect(database.sync.playlistSourceVersion('playlist-1'), _playlistVersion);
+  });
+
+  test(
+    'catalog reconciliation preserves shared files then removes orphans',
+    () async {
+      final library = AndroidMusicLibraryLocation(rootPath: tempDir.path);
+      await library.ensureReady();
+      final sharedFile = await _seedLocalPlaylist(
+        database: database,
+        library: library,
+        playlistName: 'First',
+        songId: 'shared-song',
+        bytes: [6, 6, 6],
+      );
+      final second = _playlist(id: 'playlist-2', name: 'Second');
+      database.playlists.upsert(second);
+      database.playlists.addSong(
+        item: PlaylistItem(
+          id: 'item_playlist-2_shared-song',
+          playlistId: second.id,
+          songId: 'shared-song',
+          sortOrder: 0,
+          createdAt: DateTime.utc(2026, 7, 26),
+        ),
+      );
+      database.sync.upsertPlaylistSnapshot(
+        playlistId: second.id,
+        sourceVersion: _playlistVersion,
+        syncedAt: DateTime.utc(2026, 7, 26),
+      );
+
+      final firstReconcile = await client.reconcileAuthoritativeCatalog(
+        catalog: const RemotePlaylistCatalog(
+          version: _catalogVersion,
+          playlists: [
+            RemotePlaylist(
+              id: 'playlist-2',
+              name: 'Second',
+              sortOrder: 0,
+              songCount: 1,
+              version: _playlistVersion,
+            ),
+          ],
+        ),
+        database: database,
+        library: library,
+      );
+
+      expect(firstReconcile.removedPlaylistCount, 1);
+      expect(firstReconcile.removedSongCount, 0);
+      expect(await sharedFile.exists(), isTrue);
+      expect(database.songs.findById('shared-song'), isNotNull);
+
+      final secondReconcile = await client.reconcileAuthoritativeCatalog(
+        catalog: const RemotePlaylistCatalog(
+          version:
+              '3333333333333333333333333333333333333333333333333333333333333333',
+          playlists: [],
+        ),
+        database: database,
+        library: library,
+      );
+
+      expect(secondReconcile.removedPlaylistCount, 1);
+      expect(secondReconcile.removedSongCount, 1);
+      expect(await sharedFile.exists(), isFalse);
+      expect(database.songs.findById('shared-song'), isNull);
+    },
+  );
 }
 
 Future<PlaylistSyncResult> _syncRemotePlaylist({
@@ -360,6 +454,7 @@ Future<PlaylistSyncResult> _syncRemotePlaylist({
       name: 'Remote',
       sortOrder: 0,
       songCount: 1,
+      version: _playlistVersion,
     ),
     database: database,
     library: library,
@@ -427,6 +522,11 @@ Future<File> _seedLocalPlaylist({
       status: SyncCacheStatus.synced,
       syncedAt: DateTime.utc(2026, 7, 8),
     ),
+  );
+  database.sync.upsertPlaylistSnapshot(
+    playlistId: playlist.id,
+    sourceVersion: 'old-version',
+    syncedAt: DateTime.utc(2026, 7, 8),
   );
   return file;
 }

@@ -54,6 +54,7 @@ Android 使用 `path_provider` 取得 APP Documents 目录：
 | `playlists` | 歌单名称和排序 |
 | `playlist_items` | 歌单与歌曲关系；同一歌单中的同一首歌唯一 |
 | `sync_cache` | Android 本地缓存路径、hash、状态和同步时间 |
+| `synced_playlists` | Android 已同步歌单快照、Windows 内容版本和同步时间；支持空歌单 |
 
 `SearchRepository` 在 Android 使用 `sync_cache.status = synced` 限制歌曲和歌单搜索，避免展示尚未下载的电脑端内容。
 
@@ -102,13 +103,15 @@ session_id=<current session>&connect_code=<current code>
 
 ### Android 同步步骤
 
-1. 扫描二维码，或粘贴载荷作为备用。
+1. 扫描二维码，或粘贴 Windows 端复制的完整连接信息作为备用；单独 6 位连接码不能完成连接。
 2. `POST /connect` 验证会话与连接码。
-3. 读取 `/playlists`，选择整张歌单。
-4. 读取 manifest；hash 相同且本地文件存在时跳过下载。
-5. 下载缺失或变化文件到 APP 私有 `audio/` 目录，核对 SHA-256。
-6. 写入歌曲、歌单、关系和 `sync_cache`。
-7. 成功后 Android 清除搜索条件、刷新本地库、选中刚同步歌单并返回音乐库。
+3. 读取 `/playlists` 的权威清单、`catalog_version` 和各歌单 `version`，移除 Windows 已删除的本地快照。
+4. 读取 manifest 并核对 `playlist_version`；hash、大小和本地文件一致时跳过下载。
+5. 预检手机空间，再下载到 APP 私有 `.sync_staging/`，核对大小和 SHA-256。
+6. 在 SQLite 事务中写入歌曲、歌单、关系、`sync_cache` 和 `synced_playlists`。
+7. 正式文件替换前保留旧缓存备份；事务或替换失败时回滚并恢复旧文件。
+8. 按歌单引用清理孤儿缓存，共用歌曲不会被误删。
+9. 成功后 Android 清除搜索条件、刷新本地库、选中刚同步歌单并返回音乐库。
 
 单首下载失败不会抹掉已成功文件；结果会保留失败数量和第一个失败原因，用户可重新同步该歌单。
 

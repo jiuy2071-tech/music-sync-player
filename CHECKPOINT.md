@@ -18,12 +18,14 @@ D:\Projects\music_sync_player
 - Windows 验收入口：`release\windows\MusicSyncPlayer\YijiaMusic.exe`。
 - Android 验收入口：`release\android\music_sync_player_v1_debug.apk`。
 - 2026-07-26 已完成 Android 前两轮 P0 同步安全加固：临时下载、大小与 Hash 校验、SQLite 事务、正式文件备份替换、失败恢复、存储空间预检、20 秒网络超时和有限重试。
+- 2026-07-26 已完成 Windows 权威歌单版本、Android 已同步歌单快照、空歌单显示、主端删除对账、引用判断和孤儿文件清理。
 - 2026-07-26 Android `flutter analyze`、完整 `flutter test` 和 `flutter build apk --debug` 已通过。
+- 2026-07-26 Windows `flutter analyze`、完整 `flutter test` 和 `flutter build windows` 已通过；Windows 完整运行目录和 Android APK 均已更新。
 - `manual_test_audio/` 是项目内生成的非敏感样本，已被 Git 忽略，不能提交。
 
 ## 下一步
 
-继续完成 P0 同步安全闭环：Windows 权威歌单清单、Android 主端对账、引用与孤儿文件清理。之后进行真机断网、坏包、重复同步、电脑端删除和离线播放回归。保持 V1 范围，不扩展云同步、远程播放或 Android 主库编辑。
+自动代码安全项已经闭环。下一步进行真机断网、旧数据库升级、重复同步、电脑端删除、空歌单和离线播放回归，并补 Windows 播放后端启动能力检查。详细设计与负面测试见 `docs\sync_safety_plan.md`。保持 V1 范围，不扩展云同步、远程播放或 Android 主库编辑。
 
 ## 环境与交付注意事项
 

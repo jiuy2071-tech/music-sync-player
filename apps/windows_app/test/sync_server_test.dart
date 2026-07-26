@@ -69,16 +69,37 @@ void main() {
     final playlists = await _getJson('$baseUrl/playlists?$authQuery');
     expect(playlists['ok'], isTrue);
     expect(playlists['playlists'], hasLength(1));
+    expect(playlists['catalog_version'], hasLength(64));
+    final playlistVersion =
+        ((playlists['playlists'] as List).single
+                as Map<String, Object?>)['version']
+            as String;
+    expect(playlistVersion, hasLength(64));
 
     final manifest = await _getJson(
       '$baseUrl/playlists/${playlist.id}/manifest?$authQuery',
     );
     expect(manifest['ok'], isTrue);
     expect(manifest['songs'], hasLength(1));
+    expect(manifest['playlist_version'], playlistVersion);
     expect((manifest['songs'] as List).single['local_path'], isNull);
 
-    final downloaded = await _getBytes('$baseUrl/songs/${song.id}/file?$authQuery');
+    final downloaded = await _getBytes(
+      '$baseUrl/songs/${song.id}/file?$authQuery',
+    );
     expect(downloaded, [1, 2, 3, 4]);
+
+    database.playlists.removeSong(playlistId: playlist.id, songId: song.id);
+    final changedPlaylists = await _getJson('$baseUrl/playlists?$authQuery');
+    expect(
+      changedPlaylists['catalog_version'],
+      isNot(playlists['catalog_version']),
+    );
+    expect(
+      ((changedPlaylists['playlists'] as List).single
+          as Map<String, Object?>)['song_count'],
+      0,
+    );
   });
 }
 
