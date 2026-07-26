@@ -1,13 +1,17 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/services.dart';
 import 'package:music_core/music_core.dart';
 import 'package:music_database/music_database.dart';
 import 'package:music_sync_protocol/music_sync_protocol.dart';
 import 'package:path/path.dart' as p;
 
 import 'android_library.dart';
+
+typedef AvailableBytesProvider = Future<int> Function(String path);
 
 class RemotePlaylist {
   const RemotePlaylist({
@@ -51,10 +55,24 @@ class PlaylistSyncResult {
 }
 
 class AndroidSyncClient {
-  AndroidSyncClient({HttpClient? httpClient})
-    : _httpClient = httpClient ?? HttpClient();
+  AndroidSyncClient({
+    HttpClient? httpClient,
+    AvailableBytesProvider? availableBytesProvider,
+    Duration networkTimeout = const Duration(seconds: 20),
+    int maxNetworkAttempts = 3,
+  }) : assert(maxNetworkAttempts > 0),
+       _httpClient = httpClient ?? HttpClient(),
+       _availableBytesProvider =
+           availableBytesProvider ?? _androidAvailableBytes,
+       _networkTimeout = networkTimeout,
+       _maxNetworkAttempts = maxNetworkAttempts {
+    _httpClient.connectionTimeout = networkTimeout;
+  }
 
   final HttpClient _httpClient;
+  final AvailableBytesProvider _availableBytesProvider;
+  final Duration _networkTimeout;
+  final int _maxNetworkAttempts;
 
   Future<void> connect(SyncQrPayload payload) async {
     final response = await _postJson(_uri(payload, '/connect'), {
@@ -115,7 +133,6 @@ class AndroidSyncClient {
         '${playlist.id}_${DateTime.now().microsecondsSinceEpoch}',
       ),
     );
-    await stagingDirectory.create(recursive: true);
 
     final preparedSongs = <_PreparedSong>[];
     var skipped = 0;
@@ -153,31 +170,15 @@ class AndroidSyncClient {
             await targetFile.length() == expectedSize &&
             await _fileHash(targetFile) == expectedHash;
 
-        File? stagedFile;
+        Uri? downloadUri;
         if (canReuse) {
           skipped++;
         } else {
-          final downloadUri = _validatedDownloadUri(
+          downloadUri = _validatedDownloadUri(
             payload,
             songId,
             songJson['download_url']! as String,
           );
-          stagedFile = File(
-            p.join(
-              stagingDirectory.path,
-              'downloads',
-              '$index.${format.extension}',
-            ),
-          );
-          await _downloadFile(downloadUri, stagedFile);
-          final actualSize = await stagedFile.length();
-          if (actualSize != expectedSize) {
-            throw AppError('sync_size_mismatch', '歌曲 $songId 下载不完整');
-          }
-          final actualHash = await _fileHash(stagedFile);
-          if (actualHash != expectedHash) {
-            throw AppError('sync_hash_mismatch', '歌曲 $songId 下载文件校验失败');
-          }
         }
 
         final now = DateTime.now().toUtc();
@@ -220,9 +221,48 @@ class AndroidSyncClient {
               syncedAt: now,
             ),
             targetFile: targetFile,
-            stagedFile: stagedFile,
+            downloadUri: downloadUri,
+            expectedSize: expectedSize,
+            expectedHash: expectedHash,
           ),
         );
+      }
+
+      final bytesToDownload = preparedSongs
+          .where((prepared) => prepared.downloadUri != null)
+          .fold<int>(0, (total, prepared) => total + prepared.expectedSize);
+      await _ensureAvailableStorage(
+        libraryPath: library.rootPath,
+        bytesToDownload: bytesToDownload,
+      );
+
+      await stagingDirectory.create(recursive: true);
+      for (var index = 0; index < preparedSongs.length; index++) {
+        final prepared = preparedSongs[index];
+        final downloadUri = prepared.downloadUri;
+        if (downloadUri == null) {
+          continue;
+        }
+        final stagedFile = File(
+          p.join(
+            stagingDirectory.path,
+            'downloads',
+            '$index.${prepared.song.format.extension}',
+          ),
+        );
+        prepared.stagedFile = stagedFile;
+        await _downloadFile(downloadUri, stagedFile);
+        final actualSize = await stagedFile.length();
+        if (actualSize != prepared.expectedSize) {
+          throw AppError('sync_size_mismatch', '歌曲 ${prepared.song.id} 下载不完整');
+        }
+        final actualHash = await _fileHash(stagedFile);
+        if (actualHash != prepared.expectedHash) {
+          throw AppError(
+            'sync_hash_mismatch',
+            '歌曲 ${prepared.song.id} 下载文件校验失败',
+          );
+        }
       }
 
       final replacements = <_AppliedReplacement>[];
@@ -266,7 +306,9 @@ class AndroidSyncClient {
       }
 
       return PlaylistSyncResult(
-        downloadedCount: preparedSongs.length - skipped,
+        downloadedCount: preparedSongs
+            .where((prepared) => prepared.downloadUri != null)
+            .length,
         skippedCount: skipped,
         failedCount: 0,
         localSongCount: database.search
@@ -280,6 +322,25 @@ class AndroidSyncClient {
             .delete(recursive: true)
             .catchError((_) => stagingDirectory);
       }
+    }
+  }
+
+  Future<void> _ensureAvailableStorage({
+    required String libraryPath,
+    required int bytesToDownload,
+  }) async {
+    if (bytesToDownload == 0) {
+      return;
+    }
+    const minimumHeadroom = 16 * 1024 * 1024;
+    final requiredBytes = bytesToDownload + minimumHeadroom;
+    final availableBytes = await _availableBytesProvider(libraryPath);
+    if (availableBytes < requiredBytes) {
+      throw AppError(
+        'sync_insufficient_storage',
+        '手机空间不足，需要至少 ${_formatMegabytes(requiredBytes)}，'
+            '当前可用 ${_formatMegabytes(availableBytes)}',
+      );
     }
   }
 
@@ -303,41 +364,77 @@ class AndroidSyncClient {
   }
 
   Future<Map<String, Object?>> _getJson(Uri uri) async {
-    final request = await _httpClient.getUrl(uri);
-    final response = await request.close();
-    final text = await utf8.decoder.bind(response).join();
-    _requireSuccessfulResponse(response.statusCode, text);
-    return jsonDecode(text) as Map<String, Object?>;
+    return _withNetworkRetry(() async {
+      final request = await _httpClient.getUrl(uri).timeout(_networkTimeout);
+      final response = await request.close().timeout(_networkTimeout);
+      final text = await utf8.decoder
+          .bind(response.timeout(_networkTimeout))
+          .join();
+      _requireSuccessfulResponse(response.statusCode, text);
+      return jsonDecode(text) as Map<String, Object?>;
+    });
   }
 
   Future<Map<String, Object?>> _postJson(
     Uri uri,
     Map<String, Object?> body,
   ) async {
-    final request = await _httpClient.postUrl(uri);
-    request.headers.contentType = ContentType.json;
-    request.write(jsonEncode(body));
-    final response = await request.close();
-    final text = await utf8.decoder.bind(response).join();
-    _requireSuccessfulResponse(response.statusCode, text);
-    return jsonDecode(text) as Map<String, Object?>;
+    return _withNetworkRetry(() async {
+      final request = await _httpClient.postUrl(uri).timeout(_networkTimeout);
+      request.headers.contentType = ContentType.json;
+      request.write(jsonEncode(body));
+      final response = await request.close().timeout(_networkTimeout);
+      final text = await utf8.decoder
+          .bind(response.timeout(_networkTimeout))
+          .join();
+      _requireSuccessfulResponse(response.statusCode, text);
+      return jsonDecode(text) as Map<String, Object?>;
+    });
   }
 
   Future<void> _downloadFile(Uri uri, File targetFile) async {
     await targetFile.parent.create(recursive: true);
-    final request = await _httpClient.getUrl(uri);
-    final response = await request.close();
-    if (response.statusCode != HttpStatus.ok) {
-      final message = await utf8.decoder.bind(response).join();
-      throw AppError('sync_download_failed', message);
+    await _withNetworkRetry(() async {
+      if (await targetFile.exists()) {
+        await targetFile.delete();
+      }
+      final request = await _httpClient.getUrl(uri).timeout(_networkTimeout);
+      final response = await request.close().timeout(_networkTimeout);
+      if (response.statusCode != HttpStatus.ok) {
+        final message = await utf8.decoder
+            .bind(response.timeout(_networkTimeout))
+            .join();
+        if (_isTransientStatusCode(response.statusCode)) {
+          throw _TransientSyncException(
+            '同步服务暂时不可用（${response.statusCode}）：$message',
+          );
+        }
+        throw AppError('sync_download_failed', message);
+      }
+      final sink = targetFile.openWrite();
+      try {
+        await response.timeout(_networkTimeout).pipe(sink);
+      } catch (_) {
+        await targetFile.delete().catchError((_) => targetFile);
+        rethrow;
+      }
+    });
+  }
+
+  Future<T> _withNetworkRetry<T>(Future<T> Function() action) async {
+    for (var attempt = 1; attempt <= _maxNetworkAttempts; attempt++) {
+      try {
+        return await action();
+      } catch (error) {
+        final shouldRetry =
+            attempt < _maxNetworkAttempts && _isRetryableNetworkError(error);
+        if (!shouldRetry) {
+          rethrow;
+        }
+        await Future<void>.delayed(Duration(milliseconds: 250 * attempt));
+      }
     }
-    final sink = targetFile.openWrite();
-    try {
-      await response.pipe(sink);
-    } catch (_) {
-      await targetFile.delete().catchError((_) => targetFile);
-      rethrow;
-    }
+    throw StateError('Unreachable network retry state');
   }
 
   Uri _validatedDownloadUri(
@@ -361,19 +458,24 @@ class AndroidSyncClient {
 }
 
 class _PreparedSong {
-  const _PreparedSong({
+  _PreparedSong({
     required this.song,
     required this.item,
     required this.cache,
     required this.targetFile,
-    required this.stagedFile,
+    required this.downloadUri,
+    required this.expectedSize,
+    required this.expectedHash,
   });
 
   final Song song;
   final PlaylistItem item;
   final SyncCacheEntry cache;
   final File targetFile;
-  final File? stagedFile;
+  final Uri? downloadUri;
+  final int expectedSize;
+  final String expectedHash;
+  File? stagedFile;
 }
 
 class _AppliedReplacement {
@@ -437,8 +539,33 @@ void _requirePathWithin(String parentPath, String childPath) {
 
 void _requireSuccessfulResponse(int statusCode, String responseBody) {
   if (statusCode < HttpStatus.ok || statusCode >= HttpStatus.multipleChoices) {
+    if (_isTransientStatusCode(statusCode)) {
+      throw _TransientSyncException('同步服务暂时不可用（$statusCode）：$responseBody');
+    }
     throw AppError('sync_http_failed', '同步服务返回 $statusCode：$responseBody');
   }
+}
+
+bool _isTransientStatusCode(int statusCode) {
+  return statusCode == HttpStatus.requestTimeout ||
+      statusCode == HttpStatus.tooManyRequests ||
+      statusCode >= HttpStatus.internalServerError;
+}
+
+bool _isRetryableNetworkError(Object error) {
+  return error is SocketException ||
+      error is HttpException ||
+      error is TimeoutException ||
+      error is _TransientSyncException;
+}
+
+class _TransientSyncException implements Exception {
+  const _TransientSyncException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
 }
 
 bool _readBool(Object? value) {
@@ -457,4 +584,20 @@ bool _readBool(Object? value) {
 Future<String> _fileHash(File file) async {
   final digest = await sha256.bind(file.openRead()).first;
   return digest.toString();
+}
+
+Future<int> _androidAvailableBytes(String path) async {
+  const channel = MethodChannel('music_sync_player/storage');
+  final bytes = await channel.invokeMethod<int>('getAvailableBytes', {
+    'path': path,
+  });
+  if (bytes == null || bytes < 0) {
+    throw const AppError('sync_storage_check_failed', '无法读取手机剩余空间');
+  }
+  return bytes;
+}
+
+String _formatMegabytes(int bytes) {
+  final megabytes = bytes / (1024 * 1024);
+  return '${megabytes.toStringAsFixed(megabytes < 10 ? 1 : 0)} MB';
 }

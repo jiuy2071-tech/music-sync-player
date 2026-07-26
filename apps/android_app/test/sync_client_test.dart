@@ -19,15 +19,21 @@ void main() {
   late Map<String, List<int>> responseBytes;
   late List<Map<String, Object?>> Function() manifestSongs;
   late String manifestPlaylistName;
+  late int downloadRequestCount;
+  late int transientDownloadFailures;
 
   setUp(() async {
     tempDir = await Directory.systemTemp.createTemp('oneplus_android_sync_');
     database = MusicDatabase.memory();
-    client = AndroidSyncClient();
+    client = AndroidSyncClient(
+      availableBytesProvider: (_) async => 1024 * 1024 * 1024,
+    );
     responseBytes = {
       'song-1': [1, 2, 3, 4, 5],
     };
     manifestPlaylistName = 'Daily';
+    downloadRequestCount = 0;
+    transientDownloadFailures = 0;
 
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     payload = SyncQrPayload(
@@ -79,6 +85,14 @@ void main() {
           request.uri.pathSegments.length == 3 &&
           request.uri.pathSegments.first == 'songs' &&
           request.uri.pathSegments.last == 'file') {
+        downloadRequestCount++;
+        if (transientDownloadFailures > 0) {
+          transientDownloadFailures--;
+          request.response.statusCode = HttpStatus.serviceUnavailable;
+          request.response.write('try again');
+          await request.response.close();
+          return;
+        }
         final songId = request.uri.pathSegments[1];
         final bytes = responseBytes[songId];
         if (bytes == null) {
@@ -271,10 +285,65 @@ void main() {
     );
 
     expect(database.songs.all(), isEmpty);
-    expect(
-      await File(p.join(tempDir.parent.path, 'escape.mp3')).exists(),
-      isFalse,
+    expect(await File(p.join(tempDir.path, 'escape.mp3')).exists(), isFalse);
+  });
+
+  test(
+    'storage preflight stops before downloading or changing local data',
+    () async {
+      final library = AndroidMusicLibraryLocation(rootPath: tempDir.path);
+      await library.ensureReady();
+      final oldFile = await _seedLocalPlaylist(
+        database: database,
+        library: library,
+        playlistName: 'Before sync',
+        songId: 'old-song',
+        bytes: [4, 4, 4],
+      );
+      await client.dispose();
+      client = AndroidSyncClient(availableBytesProvider: (_) async => 0);
+
+      await expectLater(
+        _syncRemotePlaylist(
+          client: client,
+          payload: payload,
+          database: database,
+          library: library,
+        ),
+        throwsA(
+          isA<AppError>().having(
+            (error) => error.code,
+            'code',
+            'sync_insufficient_storage',
+          ),
+        ),
+      );
+
+      expect(downloadRequestCount, 0);
+      expect(database.playlists.findById('playlist-1')?.name, 'Before sync');
+      expect(
+        database.playlists.songsForPlaylist('playlist-1').single.id,
+        'old-song',
+      );
+      expect(await oldFile.readAsBytes(), [4, 4, 4]);
+    },
+  );
+
+  test('transient server failure is retried with the same session', () async {
+    final library = AndroidMusicLibraryLocation(rootPath: tempDir.path);
+    await library.ensureReady();
+    transientDownloadFailures = 1;
+
+    final result = await _syncRemotePlaylist(
+      client: client,
+      payload: payload,
+      database: database,
+      library: library,
     );
+
+    expect(result.downloadedCount, 1);
+    expect(downloadRequestCount, 2);
+    expect(database.search.searchSongs('', syncedOnly: true), hasLength(1));
   });
 }
 
