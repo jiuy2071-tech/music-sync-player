@@ -105,6 +105,7 @@ class _AndroidHomePageState extends State<_AndroidHomePage> {
   String _status = '连接电脑后，即可把整张歌单保存到本机。';
   bool _busy = false;
   bool _isPlaying = false;
+  bool _seekGestureActive = false;
   bool _showManualConnect = false;
   int _tabIndex = 0;
   int _queueIndex = -1;
@@ -119,7 +120,7 @@ class _AndroidHomePageState extends State<_AndroidHomePage> {
     _syncClient = AndroidSyncClient();
     _player = AndroidAudioPlayer();
     _positionSubscription = _player.positionStream.listen((position) {
-      if (mounted) {
+      if (mounted && !_seekGestureActive) {
         setState(() => _playbackPosition = position);
       }
     });
@@ -388,6 +389,10 @@ class _AndroidHomePageState extends State<_AndroidHomePage> {
     }
   }
 
+  void _setSeekGestureActive(bool active) {
+    _seekGestureActive = active;
+  }
+
   Future<void> _confirmDeleteCache(Song song) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -453,13 +458,16 @@ class _AndroidHomePageState extends State<_AndroidHomePage> {
         song: song,
         position: _playbackPosition,
         duration: _playbackDuration,
-        positionStream: _player.positionStream,
+        positionStream: _player.positionStream.where(
+          (_) => !_seekGestureActive,
+        ),
         durationStream: _player.durationStream,
         isPlaying: _isPlaying,
         onPrevious: _playPrevious,
         onToggle: _togglePlayback,
         onNext: _playNext,
         onSeek: _seekPlayback,
+        onSeekGestureChanged: _setSeekGestureActive,
       ),
     );
   }
@@ -530,6 +538,7 @@ class _AndroidHomePageState extends State<_AndroidHomePage> {
               onToggle: _togglePlayback,
               onNext: _playNext,
               onSeek: _seekPlayback,
+              onSeekGestureChanged: _setSeekGestureActive,
             ),
           NavigationBar(
             selectedIndex: _tabIndex,
@@ -1107,6 +1116,7 @@ class _MiniPlayer extends StatelessWidget {
     required this.onToggle,
     required this.onNext,
     required this.onSeek,
+    required this.onSeekGestureChanged,
   });
 
   final Song song;
@@ -1118,6 +1128,7 @@ class _MiniPlayer extends StatelessWidget {
   final VoidCallback onToggle;
   final VoidCallback onNext;
   final Future<void> Function(Duration) onSeek;
+  final ValueChanged<bool> onSeekGestureChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -1192,11 +1203,12 @@ class _MiniPlayer extends StatelessWidget {
               ],
             ),
             SizedBox(
-              height: 20,
+              height: 32,
               child: _PlaybackSeekSlider(
                 position: position,
                 duration: duration,
                 onSeek: onSeek,
+                onSeekGestureChanged: onSeekGestureChanged,
               ),
             ),
           ],
@@ -1218,6 +1230,7 @@ class _NowPlayingSheet extends StatelessWidget {
     required this.onToggle,
     required this.onNext,
     required this.onSeek,
+    required this.onSeekGestureChanged,
   });
 
   final Song song;
@@ -1230,6 +1243,7 @@ class _NowPlayingSheet extends StatelessWidget {
   final VoidCallback onToggle;
   final VoidCallback onNext;
   final Future<void> Function(Duration) onSeek;
+  final ValueChanged<bool> onSeekGestureChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -1293,6 +1307,7 @@ class _NowPlayingSheet extends StatelessWidget {
                           position: livePosition,
                           duration: liveDuration,
                           onSeek: onSeek,
+                          onSeekGestureChanged: onSeekGestureChanged,
                         ),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1355,11 +1370,13 @@ class _PlaybackSeekSlider extends StatefulWidget {
     required this.position,
     required this.duration,
     required this.onSeek,
+    required this.onSeekGestureChanged,
   });
 
   final Duration position;
   final Duration duration;
   final Future<void> Function(Duration) onSeek;
+  final ValueChanged<bool> onSeekGestureChanged;
 
   @override
   State<_PlaybackSeekSlider> createState() => _PlaybackSeekSliderState();
@@ -1367,6 +1384,15 @@ class _PlaybackSeekSlider extends StatefulWidget {
 
 class _PlaybackSeekSliderState extends State<_PlaybackSeekSlider> {
   double? _previewValue;
+  bool _dragging = false;
+
+  @override
+  void dispose() {
+    if (_dragging) {
+      widget.onSeekGestureChanged(false);
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1378,25 +1404,40 @@ class _PlaybackSeekSliderState extends State<_PlaybackSeekSlider> {
     return Slider(
       value: enabled ? value : 0,
       max: enabled ? max.toDouble() : 1,
-      onChangeStart: enabled
-          ? (next) => setState(() => _previewValue = next)
-          : null,
-      onChanged: enabled
-          ? (next) => setState(() => _previewValue = next)
-          : null,
+      onChangeStart: enabled ? _startDrag : null,
+      onChanged: enabled ? _updatePreview : null,
       onChangeEnd: enabled
           ? (next) {
-              setState(() => _previewValue = next);
+              _updatePreview(next);
               unawaited(_commitSeek(next));
             }
           : null,
     );
   }
 
+  void _startDrag(double value) {
+    if (!_dragging) {
+      _dragging = true;
+      widget.onSeekGestureChanged(true);
+    }
+    _updatePreview(value);
+  }
+
+  void _updatePreview(double value) {
+    setState(() => _previewValue = value);
+  }
+
   Future<void> _commitSeek(double value) async {
-    await widget.onSeek(Duration(milliseconds: value.round()));
-    if (mounted) {
-      setState(() => _previewValue = null);
+    try {
+      await widget.onSeek(Duration(milliseconds: value.round()));
+    } finally {
+      if (_dragging) {
+        _dragging = false;
+        widget.onSeekGestureChanged(false);
+      }
+      if (mounted) {
+        setState(() => _previewValue = null);
+      }
     }
   }
 }
