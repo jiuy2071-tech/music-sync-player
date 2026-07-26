@@ -46,6 +46,12 @@ Passed with generated samples:
   manual-paste fallback UI.
 - Android local-player controls: play/pause state, previous/next queue actions
   and seek wiring are covered by application-level tests and build validation.
+- Android atomic sync rollback for incomplete downloads and Hash mismatches.
+- Android storage preflight, bounded retry, session-bound download URLs and
+  unsafe path rejection.
+- Windows authoritative playlist versions, Android empty-playlist snapshots,
+  shared-song reference protection and orphan cleanup.
+- Windows startup detection for `ffplay` and `ffprobe`.
 
 Builds passed:
 
@@ -93,6 +99,13 @@ Android sync:
 - Delete local cache for one song and confirm the Windows library is unchanged.
 - Turn off Wi-Fi or close Windows sync mode and confirm Android can still play
   already-synced songs offline.
+- Delete a Windows playlist and reconnect Android; confirm the old phone
+  snapshot disappears.
+- Remove a shared song from one Windows playlist and confirm another synced
+  playlist still keeps its local file.
+- Sync an empty Windows playlist and confirm it remains visible on Android.
+- Interrupt a real playlist download and confirm the previously playable phone
+  snapshot remains unchanged.
 
 ## Still Needs Manual Device Confirmation
 
@@ -110,6 +123,19 @@ running Windows app and an Android device:
   unchanged.
 - Close Windows sync mode or disconnect Wi-Fi and confirm Android still plays
   already-synced files offline.
+- Upgrade an Android installation that already contains a non-empty old-format
+  synced library and confirm its playlists are migrated without data loss.
+
+## 2026-07-26 Emulator Upgrade Check
+
+- Installed the latest fixed APK with `adb install -r`, preserving the
+  emulator's existing APP data.
+- The Android process started and remained running after the upgrade.
+- Checked recent logcat output; no `FATAL EXCEPTION`, `AndroidRuntime` crash or
+  Flutter startup failure was present.
+- This confirms overwrite installation and startup migration on the emulator.
+  It does not prove migration of a real non-empty old synced library, real
+  camera scanning, same-Wi-Fi transfer or offline playback on a physical phone.
 
 ## 当前自动覆盖
 
@@ -125,3 +151,6 @@ Automated tests currently cover:
 - Android sync client connect, playlist fetch, whole-playlist sync, local file
   write, local database write, and synced-only search visibility.
 - Windows generated-audio import and playback probes.
+- Atomic download rollback, storage preflight, finite network retry, playlist
+  version matching, empty snapshots, authoritative deletion reconciliation,
+  reference-aware orphan cleanup and Windows playback capability detection.

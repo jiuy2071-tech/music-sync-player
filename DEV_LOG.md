@@ -38,6 +38,8 @@
 - 缺少 `ffplay` 时播放操作会被明确阻止，但导入、歌单管理和 Wi-Fi 同步不受影响。
 - 新增播放能力检测自动测试；Windows `flutter analyze`、完整 `flutter test` 和 `flutter build windows` 再次通过。
 - Windows 交付目录已整体镜像更新，并核对 `data\app.so` 与构建目录 Hash 一致，保证固定 EXE 加载本次业务代码。
+- 最新 Android APK 已通过 `adb install -r` 保留模拟器现有 APP 数据覆盖安装；启动后进程正常，近期日志没有 Android 或 Flutter 崩溃。
+- 模拟器覆盖升级不能替代“真实旧版非空同步库迁移”和实体手机断网验收，这两项继续保留为人工确认。
 
 ## 当前交付
 

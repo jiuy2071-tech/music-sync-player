@@ -22,6 +22,7 @@ D:\Projects\music_sync_player
 - 2026-07-26 Android `flutter analyze`、完整 `flutter test` 和 `flutter build apk --debug` 已通过。
 - 2026-07-26 Windows `flutter analyze`、完整 `flutter test` 和 `flutter build windows` 已通过；Windows 完整运行目录和 Android APK 均已更新。
 - 2026-07-26 Windows 已增加启动播放能力检测，缺少 `ffplay` 或 `ffprobe` 时会在底部播放器显示明确状态。
+- 2026-07-26 最新 Android APK 已在模拟器保留数据覆盖安装并正常启动，无启动崩溃；真实非空旧库迁移仍需实体场景确认。
 - `manual_test_audio/` 是项目内生成的非敏感样本，已被 Git 忽略，不能提交。
 
 ## 下一步
