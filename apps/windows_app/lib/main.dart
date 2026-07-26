@@ -35,18 +35,32 @@ Future<void> main() async {
   final library = await MusicLibraryLocation.resolve();
   await library.ensureReady();
   final database = MusicDatabase.open(library.databasePath);
-  runApp(WindowsMusicApp(database: database, library: library));
+  final capabilityProbe = WindowsAudioPlayer();
+  final playerCapability = await capabilityProbe.inspectCapability();
+  await capabilityProbe.dispose();
+  runApp(
+    WindowsMusicApp(
+      database: database,
+      library: library,
+      playerCapability: playerCapability,
+    ),
+  );
 }
 
 class WindowsMusicApp extends StatelessWidget {
   const WindowsMusicApp({
     required this.database,
     required this.library,
+    this.playerCapability = const WindowsPlayerCapability(
+      canPlay: true,
+      canProbeDuration: true,
+    ),
     super.key,
   });
 
   final MusicDatabase database;
   final MusicLibraryLocation library;
+  final WindowsPlayerCapability playerCapability;
 
   @override
   Widget build(BuildContext context) {
@@ -198,7 +212,11 @@ class WindowsMusicApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: WindowsHomePage(database: database, library: library),
+      home: WindowsHomePage(
+        database: database,
+        library: library,
+        playerCapability: playerCapability,
+      ),
     );
   }
 }
@@ -207,11 +225,13 @@ class WindowsHomePage extends StatefulWidget {
   const WindowsHomePage({
     required this.database,
     required this.library,
+    required this.playerCapability,
     super.key,
   });
 
   final MusicDatabase database;
   final MusicLibraryLocation library;
+  final WindowsPlayerCapability playerCapability;
 
   @override
   State<WindowsHomePage> createState() => _WindowsHomePageState();
@@ -260,12 +280,15 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
   bool _busy = false;
   bool _syncBusy = false;
   bool _isPlaybackPaused = false;
+  late final WindowsPlayerCapability _playerCapability;
 
   @override
   void initState() {
     super.initState();
     _importService = AudioImportService(widget.database);
     _player = WindowsAudioPlayer();
+    _playerCapability = widget.playerCapability;
+    _status = _playerCapability.statusMessage;
     _syncServer = WindowsSyncServer(widget.database);
     _completionSubscription = _player.completionStream.listen((_) {
       if (mounted) {
@@ -551,6 +574,10 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
   }
 
   Future<void> _startPlayback(Song song) async {
+    if (!_playerCapability.canPlay) {
+      setState(() => _status = _playerCapability.statusMessage);
+      return;
+    }
     try {
       await _player.play(song);
       final duration = song.durationMs == null

@@ -34,6 +34,10 @@
 - Android 连接后会移除 Windows 已删除的本地歌单；孤儿清理按 `playlist_items` 引用判断，共用歌曲保留，最后引用消失后才删除。
 - 孤儿音频先移动到 APP 私有临时回收目录，数据库删除失败会恢复文件。
 - Windows 与 Android 的完整 `flutter analyze`、`flutter test` 和对应构建再次通过；两个固定交付位置均已覆盖为本次版本。
+- Windows 启动前会检测 `ffplay` 与 `ffprobe`：底部播放器直接显示可播放、只能播放但无法预读时长，或本地播放不可用。
+- 缺少 `ffplay` 时播放操作会被明确阻止，但导入、歌单管理和 Wi-Fi 同步不受影响。
+- 新增播放能力检测自动测试；Windows `flutter analyze`、完整 `flutter test` 和 `flutter build windows` 再次通过。
+- Windows 交付目录已整体镜像更新，并核对 `data\app.so` 与构建目录 Hash 一致，保证固定 EXE 加载本次业务代码。
 
 ## 当前交付
 

@@ -4,9 +4,33 @@ import 'dart:io';
 
 import 'package:music_core/music_core.dart';
 
-class WindowsAudioPlayer {
-  WindowsAudioPlayer();
+typedef CommandAvailabilityProbe = Future<bool> Function(String command);
 
+class WindowsPlayerCapability {
+  const WindowsPlayerCapability({
+    required this.canPlay,
+    required this.canProbeDuration,
+  });
+
+  final bool canPlay;
+  final bool canProbeDuration;
+
+  String get statusMessage {
+    if (!canPlay) {
+      return '未找到 ffplay，Windows 本地播放不可用；导入、歌单和同步仍可使用';
+    }
+    if (!canProbeDuration) {
+      return '播放组件可用；未找到 ffprobe，部分歌曲时长可能无法预读';
+    }
+    return '播放组件已就绪';
+  }
+}
+
+class WindowsAudioPlayer {
+  WindowsAudioPlayer({CommandAvailabilityProbe? commandProbe})
+    : _commandProbe = commandProbe ?? _isCommandAvailable;
+
+  final CommandAvailabilityProbe _commandProbe;
   Process? _process;
   Song? _currentSong;
   bool _paused = false;
@@ -21,6 +45,17 @@ class WindowsAudioPlayer {
       return Duration.zero;
     }
     return _basePosition + _stopwatch.elapsed;
+  }
+
+  Future<WindowsPlayerCapability> inspectCapability() async {
+    final results = await Future.wait([
+      _commandProbe('ffplay'),
+      _commandProbe('ffprobe'),
+    ]);
+    return WindowsPlayerCapability(
+      canPlay: results[0],
+      canProbeDuration: results[1],
+    );
   }
 
   Future<void> play(Song song, {Duration startAt = Duration.zero}) async {
@@ -260,4 +295,15 @@ class WindowsAudioPlayer {
         Int32 Function(IntPtr processHandle),
         int Function(int processHandle)
       >('NtResumeProcess');
+}
+
+Future<bool> _isCommandAvailable(String command) async {
+  try {
+    final result = await Process.run(command, const [
+      '-version',
+    ], runInShell: false).timeout(const Duration(seconds: 3));
+    return result.exitCode == 0;
+  } on Object {
+    return false;
+  }
 }

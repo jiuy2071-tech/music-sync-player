@@ -50,7 +50,7 @@ D:\Projects\music_sync_player\release\android\music_sync_player_v1_debug.apk
 3. 在“添加歌曲”中导入文件或文件夹，在“音乐库”中播放和管理歌单。
 4. 在“Wi-Fi 同步”中开启同步模式，显示二维码和连接码。
 
-Windows 本地播放依赖本机可启动的 `ffplay`。没有它时，导入、歌单和同步仍可使用，但 Windows 本地播放会提示后端不可用。
+Windows 启动时会检测 `ffplay` 和 `ffprobe`，结果显示在底部播放器状态区。没有 `ffplay` 时，导入、歌单和同步仍可使用，但 Windows 本地播放会被明确标为不可用；没有 `ffprobe` 时仍可播放，只是部分歌曲时长可能无法提前读取。
 
 ### Android
 
