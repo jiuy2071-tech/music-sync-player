@@ -135,6 +135,23 @@ void main() {
     expect(result, hasLength(1));
     expect(result.single.id, 'playlist-1');
   });
+
+  test('transaction rolls back all database changes after a failure', () async {
+    final playlist = _playlist(id: 'playlist-1', name: 'Before');
+    database.playlists.upsert(playlist);
+
+    await expectLater(
+      database.transaction<void>(() async {
+        database.playlists.upsert(_playlist(id: playlist.id, name: 'After'));
+        database.songs.upsert(_song(id: 'song-1', title: 'Temporary'));
+        throw StateError('stop transaction');
+      }),
+      throwsStateError,
+    );
+
+    expect(database.playlists.findById(playlist.id)?.name, 'Before');
+    expect(database.songs.findById('song-1'), isNull);
+  });
 }
 
 Song _song({required String id, required String title}) {

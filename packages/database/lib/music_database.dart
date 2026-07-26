@@ -34,6 +34,22 @@ class MusicDatabase {
     db.execute(_createIndexes);
   }
 
+  Future<T> transaction<T>(Future<T> Function() action) async {
+    db.execute('BEGIN IMMEDIATE;');
+    try {
+      final result = await action();
+      db.execute('COMMIT;');
+      return result;
+    } catch (error, stackTrace) {
+      try {
+        db.execute('ROLLBACK;');
+      } catch (_) {
+        // Preserve the failure that caused the transaction to be rolled back.
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+  }
+
   void close() => db.close();
 }
 
@@ -192,7 +208,9 @@ class PlaylistRepository {
   }
 
   void clearSongs(String playlistId) {
-    _db.execute('DELETE FROM playlist_items WHERE playlist_id = ?', [playlistId]);
+    _db.execute('DELETE FROM playlist_items WHERE playlist_id = ?', [
+      playlistId,
+    ]);
   }
 
   List<Song> songsForPlaylist(String playlistId) {

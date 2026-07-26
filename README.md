@@ -104,6 +104,12 @@ D:\Dev\flutter\bin\flutter.bat build apk --debug
 
 项目内 `manual_test_audio/` 包含非敏感自动生成样本，仅用于导入和播放验收，并且被 Git 忽略。详细样本与人工检查清单见 [testing_notes.md](testing_notes.md)。
 
+## 同步数据安全
+
+Android 同步会先把整张歌单需要的新文件下载到 APP 私有临时目录，核对文件大小和 SHA-256 后，再在 SQLite 事务内更新本地歌单并替换正式缓存。同步中断、文件不完整或 Hash 错误时，旧歌单和原本可播放的缓存会保留。
+
+当前仍在补齐 Windows 主端删除后的对账、手机存储空间预检、网络超时重试和孤儿缓存清理；这些属于 V1 安全收尾，不会增加云同步或远程在线播放。
+
 ## 仍需人工确认
 
 - Windows 真实文件选择器和文件夹选择器的完整点击流程。

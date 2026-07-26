@@ -88,6 +88,7 @@ class AndroidSyncClient {
     required MusicDatabase database,
     required AndroidMusicLibraryLocation library,
   }) async {
+    _requireSafeId(remotePlaylist.id, 'playlist');
     final manifest = await _getJson(
       _uri(payload, '/playlists/${remotePlaylist.id}/manifest', auth: true),
     );
@@ -100,45 +101,87 @@ class AndroidSyncClient {
 
     final playlistJson = manifest['playlist']! as Map<String, Object?>;
     final playlist = Playlist.fromMap(playlistJson);
-    database.playlists.upsert(playlist);
-    database.playlists.clearSongs(playlist.id);
+    if (playlist.id != remotePlaylist.id) {
+      throw const AppError('sync_manifest_invalid', '同步清单中的歌单与所选歌单不一致');
+    }
 
-    final songs = (manifest['songs']! as List).cast<Map<String, Object?>>();
-    var downloaded = 0;
+    final songJsonList = (manifest['songs']! as List)
+        .cast<Map<String, Object?>>();
+    final songIds = <String>{};
+    final stagingDirectory = Directory(
+      p.join(
+        library.rootPath,
+        '.sync_staging',
+        '${playlist.id}_${DateTime.now().microsecondsSinceEpoch}',
+      ),
+    );
+    await stagingDirectory.create(recursive: true);
+
+    final preparedSongs = <_PreparedSong>[];
     var skipped = 0;
-    var failed = 0;
-    final failureMessages = <String>[];
-
-    for (final songJson in songs) {
-      try {
+    var preserveStaging = false;
+    try {
+      for (var index = 0; index < songJsonList.length; index++) {
+        final songJson = songJsonList[index];
         final songId = songJson['id']! as String;
+        _requireSafeId(songId, 'song');
+        if (!songIds.add(songId)) {
+          throw AppError('sync_manifest_invalid', '同步清单包含重复歌曲：$songId');
+        }
+
         final format = AudioFormat.fromStorage(songJson['format']! as String);
         final expectedHash = songJson['file_hash']! as String;
+        if (!RegExp(r'^[a-fA-F0-9]{64}$').hasMatch(expectedHash)) {
+          throw AppError('sync_manifest_invalid', '歌曲 $songId 的 Hash 格式无效');
+        }
+        final expectedSize = songJson['file_size']! as int;
+        if (expectedSize <= 0) {
+          throw AppError('sync_manifest_invalid', '歌曲 $songId 的文件大小无效');
+        }
+
         final targetPath = p.join(
           library.audioPath,
           '$songId.${format.extension}',
         );
+        _requirePathWithin(library.audioPath, targetPath);
         final existingCache = database.sync.findCacheForSong(songId);
         final targetFile = File(targetPath);
-
-        if (existingCache?.status == SyncCacheStatus.synced &&
+        final canReuse =
+            existingCache?.status == SyncCacheStatus.synced &&
             existingCache?.fileHash == expectedHash &&
-            await targetFile.exists()) {
+            await targetFile.exists() &&
+            await targetFile.length() == expectedSize &&
+            await _fileHash(targetFile) == expectedHash;
+
+        File? stagedFile;
+        if (canReuse) {
           skipped++;
         } else {
-          await _downloadFile(
-            Uri.parse(songJson['download_url']! as String),
-            targetFile,
+          final downloadUri = _validatedDownloadUri(
+            payload,
+            songId,
+            songJson['download_url']! as String,
           );
-          final actualHash = await _fileHash(targetFile);
-          if (actualHash != expectedHash) {
-            await targetFile.delete().catchError((_) => targetFile);
-            throw AppError('sync_hash_mismatch', '下载文件校验失败');
+          stagedFile = File(
+            p.join(
+              stagingDirectory.path,
+              'downloads',
+              '$index.${format.extension}',
+            ),
+          );
+          await _downloadFile(downloadUri, stagedFile);
+          final actualSize = await stagedFile.length();
+          if (actualSize != expectedSize) {
+            throw AppError('sync_size_mismatch', '歌曲 $songId 下载不完整');
           }
-          downloaded++;
+          final actualHash = await _fileHash(stagedFile);
+          if (actualHash != expectedHash) {
+            throw AppError('sync_hash_mismatch', '歌曲 $songId 下载文件校验失败');
+          }
         }
 
         final now = DateTime.now().toUtc();
+        final existingSong = database.songs.findById(songId);
         final song = Song(
           id: songId,
           title: songJson['title']! as String,
@@ -146,7 +189,7 @@ class AndroidSyncClient {
           album: songJson['album']! as String,
           durationMs: songJson['duration_ms'] as int?,
           format: format,
-          fileSize: songJson['file_size']! as int,
+          fileSize: expectedSize,
           fileHash: expectedHash,
           localPath: targetPath,
           originalFileName: songJson['original_file_name']! as String,
@@ -154,45 +197,90 @@ class AndroidSyncClient {
             songJson['display_name_source']! as String,
           ),
           isPendingReview: _readBool(songJson['is_pending_review']),
-          createdAt: now,
+          createdAt: existingSong?.createdAt ?? now,
           updatedAt: now,
         );
-        database.songs.upsert(song);
-        database.playlists.addSong(
-          item: PlaylistItem(
-            id: 'item_${playlist.id}_${song.id}',
-            playlistId: playlist.id,
-            songId: song.id,
-            sortOrder: songJson['sort_order']! as int,
-            createdAt: now,
+        preparedSongs.add(
+          _PreparedSong(
+            song: song,
+            item: PlaylistItem(
+              id: 'item_${playlist.id}_${song.id}',
+              playlistId: playlist.id,
+              songId: song.id,
+              sortOrder: songJson['sort_order']! as int,
+              createdAt: now,
+            ),
+            cache: SyncCacheEntry(
+              id: 'cache_${song.id}',
+              songId: song.id,
+              playlistId: playlist.id,
+              localCachePath: targetPath,
+              fileHash: expectedHash,
+              status: SyncCacheStatus.synced,
+              syncedAt: now,
+            ),
+            targetFile: targetFile,
+            stagedFile: stagedFile,
           ),
         );
-        database.sync.upsertCacheEntry(
-          SyncCacheEntry(
-            id: 'cache_${song.id}',
-            songId: song.id,
-            playlistId: playlist.id,
-            localCachePath: targetPath,
-            fileHash: expectedHash,
-            status: SyncCacheStatus.synced,
-            syncedAt: now,
-          ),
-        );
-      } catch (error) {
-        failed++;
-        final title =
-            songJson['title']?.toString() ?? songJson['id'].toString();
-        failureMessages.add('$title：$error');
+      }
+
+      final replacements = <_AppliedReplacement>[];
+      try {
+        await database.transaction<void>(() async {
+          database.playlists.upsert(playlist);
+          database.playlists.clearSongs(playlist.id);
+          for (final prepared in preparedSongs) {
+            database.songs.upsert(prepared.song);
+            database.playlists.addSong(item: prepared.item);
+            database.sync.upsertCacheEntry(prepared.cache);
+          }
+          for (var index = 0; index < preparedSongs.length; index++) {
+            final prepared = preparedSongs[index];
+            final stagedFile = prepared.stagedFile;
+            if (stagedFile == null) {
+              continue;
+            }
+            await _replaceFile(
+              stagedFile: stagedFile,
+              targetFile: prepared.targetFile,
+              backupDirectory: Directory(
+                p.join(stagingDirectory.path, 'backups'),
+              ),
+              backupIndex: index,
+              replacements: replacements,
+            );
+          }
+        });
+      } catch (error, stackTrace) {
+        try {
+          await _restoreReplacements(replacements);
+        } catch (restoreError) {
+          preserveStaging = true;
+          throw AppError(
+            'sync_restore_failed',
+            '同步失败，旧缓存恢复失败：$restoreError；原始错误：$error',
+          );
+        }
+        Error.throwWithStackTrace(error, stackTrace);
+      }
+
+      return PlaylistSyncResult(
+        downloadedCount: preparedSongs.length - skipped,
+        skippedCount: skipped,
+        failedCount: 0,
+        localSongCount: database.search
+            .searchSongs('', syncedOnly: true)
+            .length,
+        failureMessages: const [],
+      );
+    } finally {
+      if (!preserveStaging) {
+        await stagingDirectory
+            .delete(recursive: true)
+            .catchError((_) => stagingDirectory);
       }
     }
-
-    return PlaylistSyncResult(
-      downloadedCount: downloaded,
-      skippedCount: skipped,
-      failedCount: failed,
-      localSongCount: database.search.searchSongs('', syncedOnly: true).length,
-      failureMessages: failureMessages,
-    );
   }
 
   Future<void> dispose() async {
@@ -218,6 +306,7 @@ class AndroidSyncClient {
     final request = await _httpClient.getUrl(uri);
     final response = await request.close();
     final text = await utf8.decoder.bind(response).join();
+    _requireSuccessfulResponse(response.statusCode, text);
     return jsonDecode(text) as Map<String, Object?>;
   }
 
@@ -230,6 +319,7 @@ class AndroidSyncClient {
     request.write(jsonEncode(body));
     final response = await request.close();
     final text = await utf8.decoder.bind(response).join();
+    _requireSuccessfulResponse(response.statusCode, text);
     return jsonDecode(text) as Map<String, Object?>;
   }
 
@@ -241,18 +331,113 @@ class AndroidSyncClient {
       final message = await utf8.decoder.bind(response).join();
       throw AppError('sync_download_failed', message);
     }
-    final tempFile = File('${targetFile.path}.download');
-    final sink = tempFile.openWrite();
+    final sink = targetFile.openWrite();
     try {
       await response.pipe(sink);
-      if (await targetFile.exists()) {
-        await targetFile.delete();
-      }
-      await tempFile.rename(targetFile.path);
     } catch (_) {
-      await tempFile.delete().catchError((_) => tempFile);
+      await targetFile.delete().catchError((_) => targetFile);
       rethrow;
     }
+  }
+
+  Uri _validatedDownloadUri(
+    SyncQrPayload payload,
+    String songId,
+    String rawUrl,
+  ) {
+    final uri = Uri.tryParse(rawUrl);
+    final expectedPath = '/songs/$songId/file';
+    if (uri == null ||
+        uri.scheme != 'http' ||
+        uri.host != payload.host ||
+        uri.port != payload.port ||
+        uri.path != expectedPath ||
+        uri.queryParameters['session_id'] != payload.sessionId ||
+        uri.queryParameters['connect_code'] != payload.connectCode) {
+      throw AppError('sync_download_url_invalid', '歌曲 $songId 的下载地址不安全或已过期');
+    }
+    return uri;
+  }
+}
+
+class _PreparedSong {
+  const _PreparedSong({
+    required this.song,
+    required this.item,
+    required this.cache,
+    required this.targetFile,
+    required this.stagedFile,
+  });
+
+  final Song song;
+  final PlaylistItem item;
+  final SyncCacheEntry cache;
+  final File targetFile;
+  final File? stagedFile;
+}
+
+class _AppliedReplacement {
+  const _AppliedReplacement({
+    required this.targetFile,
+    required this.backupFile,
+  });
+
+  final File targetFile;
+  final File? backupFile;
+}
+
+Future<void> _replaceFile({
+  required File stagedFile,
+  required File targetFile,
+  required Directory backupDirectory,
+  required int backupIndex,
+  required List<_AppliedReplacement> replacements,
+}) async {
+  await targetFile.parent.create(recursive: true);
+  File? backupFile;
+  if (await targetFile.exists()) {
+    await backupDirectory.create(recursive: true);
+    backupFile = File(p.join(backupDirectory.path, '$backupIndex.backup'));
+    await targetFile.rename(backupFile.path);
+  }
+
+  replacements.add(
+    _AppliedReplacement(targetFile: targetFile, backupFile: backupFile),
+  );
+  await stagedFile.rename(targetFile.path);
+}
+
+Future<void> _restoreReplacements(
+  List<_AppliedReplacement> replacements,
+) async {
+  for (final replacement in replacements.reversed) {
+    if (await replacement.targetFile.exists()) {
+      await replacement.targetFile.delete();
+    }
+    final backupFile = replacement.backupFile;
+    if (backupFile != null && await backupFile.exists()) {
+      await backupFile.rename(replacement.targetFile.path);
+    }
+  }
+}
+
+void _requireSafeId(String value, String field) {
+  if (!RegExp(r'^[A-Za-z0-9_-]{1,128}$').hasMatch(value)) {
+    throw AppError('sync_manifest_invalid', '同步清单中的 $field ID 不安全');
+  }
+}
+
+void _requirePathWithin(String parentPath, String childPath) {
+  final normalizedParent = p.normalize(p.absolute(parentPath));
+  final normalizedChild = p.normalize(p.absolute(childPath));
+  if (!p.isWithin(normalizedParent, normalizedChild)) {
+    throw const AppError('sync_path_unsafe', '同步文件路径超出 APP 私有音乐目录');
+  }
+}
+
+void _requireSuccessfulResponse(int statusCode, String responseBody) {
+  if (statusCode < HttpStatus.ok || statusCode >= HttpStatus.multipleChoices) {
+    throw AppError('sync_http_failed', '同步服务返回 $statusCode：$responseBody');
   }
 }
 

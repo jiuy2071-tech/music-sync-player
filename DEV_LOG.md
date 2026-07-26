@@ -17,6 +17,16 @@
 - Android 应用名称、启动图标和应用内品牌资源改为壹加音乐。
 - 最后一次自动验证通过：Windows 和 Android 的 `flutter analyze`、`flutter test` 及对应构建命令。
 
+## 2026-07-26：Android 原子同步安全加固
+
+- 修复同步开始后立即清空本地歌单的问题：歌曲、歌单关系和缓存记录现在放在同一个 SQLite 事务中提交。
+- 新文件先下载到 APP 私有临时目录，检查文件大小和 SHA-256 后才替换正式缓存。
+- 替换正式文件前保留旧文件备份；数据库或文件操作失败时回滚数据库并恢复旧缓存。
+- 增加同步清单安全检查，拒绝危险歌曲 ID、错误 Hash、越界路径和指向其他主机或旧会话的下载地址。
+- 新增不完整下载、错误 Hash、成功升级、路径越界和数据库事务回滚测试。
+- Android `flutter analyze`、完整 `flutter test` 和 `flutter build apk --debug` 已通过；新的 APK 已更新到本地交付目录。
+- Windows 权威歌单对账、空间预检、超时重试和真机断网回归仍在后续 P0 清单中。
+
 ## 当前交付
 
 - Windows：`release\windows\MusicSyncPlayer\YijiaMusic.exe`
