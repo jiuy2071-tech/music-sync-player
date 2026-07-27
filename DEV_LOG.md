@@ -56,6 +56,9 @@
 - 关闭 Windows 同步端口并完全退出 EXE 后，Android 仍取得本地音频焦点，暂停按钮保持可用，播放进度持续前进。
 - 在正式 Windows EXE 中创建 0 首歌曲的 `emulator_empty_playlist`，Android 重新连接后显示 2 张电脑歌单，并能把空歌单保存到本地歌单页。
 - Windows 删除该临时歌单后，Android 再次连接明确移除 1 张旧歌单和 0 首孤立缓存；原 `新歌单`、`回声_master` 与 37,446,236 字节本地 WAV 均保持不变。
+- 把 `回声_master` 同时加入原歌单和 `shared_reference_test` 并同步到 Android；删除临时歌单后，Android 移除旧快照但保留共用歌曲和同一个正式音频文件。
+- 把 `member_change_test` 从 1 首改为 0 首后重新同步，Android 正确把该歌单更新为空歌单，同时原歌单仍可见、共用 WAV 未被当作孤儿删除。
+- 两项测试结束后删除全部临时歌单并再次对账；Windows 与 Android 均恢复为 1 首歌曲、1 张歌单和 1 个正式音频文件。
 - 模拟器已证明正式 EXE 与 APK 的局域网同步和离线播放链路；实体手机相机权限、二维码扫描和真实 Wi-Fi 体感仍需人工验收。
 
 ## 当前交付

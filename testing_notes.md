@@ -161,10 +161,23 @@ running Windows app and an Android device:
   and zero orphaned cache files.
 - After reconciliation, Android still showed the original `新歌单` and
   `回声_master`; its private WAV remained exactly 37,446,236 bytes.
+- Added `回声_master` to both `新歌单` and `shared_reference_test`, then
+  synced the second playlist. Android kept two playlist references but still
+  stored only one WAV file.
+- Deleted `shared_reference_test` in Windows and reconnected Android. The stale
+  playlist disappeared, zero orphaned cache files were removed, and the WAV
+  referenced by `新歌单` remained exactly 37,446,236 bytes.
+- Synced `member_change_test` with one song, removed that song through the
+  Windows playlist menu, and reconnected. The remote playlist version changed
+  to zero songs; resyncing updated the Android snapshot to an empty playlist
+  without deleting the song still referenced by `新歌单`.
+- Deleted the final temporary playlist and reconciled once more. Both apps
+  returned to one playlist, one song and one formal audio file.
 - This proves the current executable and APK can complete the LAN transfer and
   offline playback flow, empty-playlist sync and authoritative deletion
-  reconciliation in the Android emulator. A physical phone is still required
-  for camera permission, QR scanning and real device Wi-Fi behavior.
+  reconciliation, playlist member changes and shared-file retention in the
+  Android emulator. A physical phone is still required for camera permission,
+  QR scanning and real device Wi-Fi behavior.
 
 ## 当前自动覆盖
 
