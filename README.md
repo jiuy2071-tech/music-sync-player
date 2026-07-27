@@ -58,6 +58,16 @@ Windows 启动时会检测 `ffplay` 和 `ffprobe`，结果显示在底部播放�
 2. 在系统安装页面允许安装本地 APK，然后打开“壹加音乐”。
 3. 底部“音乐库”只显示已同步歌曲；“歌单”只显示已同步歌单；“同步音乐”用于连接电脑。
 
+### 在电脑模拟 Android
+
+本机已有 Android Studio 虚拟手机 `YijiaMusic_Pixel_7_API_35`。启动模拟器后，可用以下命令保留现有 APP 数据并覆盖安装固定验收 APK：
+
+```powershell
+D:\Android\Sdk\platform-tools\adb.exe -s emulator-5554 install -r D:\Projects\music_sync_player\release\android\music_sync_player_v1_debug.apk
+```
+
+模拟器不方便扫描电脑屏幕时，在 Windows “Wi-Fi 同步”页点击“复制连接信息”，再在 Android “同步音乐”页展开“手动粘贴连接信息”。2026-07-27 已用正式 Windows EXE 与该模拟器完成真实连接、整张歌单同步、重复同步无重复落盘，以及 Windows 退出后的本地离线播放验证。
+
 ### 第一次 Wi-Fi 同步
 
 1. 让 Windows 电脑与 Android 手机连接到同一 Wi-Fi。

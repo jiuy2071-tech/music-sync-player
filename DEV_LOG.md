@@ -51,6 +51,10 @@
 - 数据库 10 项测试、Android 14 项测试，以及两处 `flutter analyze` 均通过。
 - Android `flutter build apk --debug` 通过，固定交付 APK 已更新；构建文件与交付文件 SHA-256 均为 `F56501F300A51BFBDCEC8D26B47F2FABBC1BD33946DE70A486F5EAB7A2392986`。
 - 本轮没有修改 Windows 代码，因此没有无意义地重复 Windows 全量构建。
+- 使用正式 `YijiaMusic.exe` 与 `emulator-5554` 完成跨进程联调：手动粘贴完整连接信息成功、显示电脑歌单、整张歌单同步成功。
+- 重复同步后 Android 仍只有 1 首歌曲、1 张歌单和 1 个正式音频文件，`.sync_staging` 为空，没有重复记录或半成品。
+- 关闭 Windows 同步端口并完全退出 EXE 后，Android 仍取得本地音频焦点，暂停按钮保持可用，播放进度持续前进。
+- 模拟器已证明正式 EXE 与 APK 的局域网同步和离线播放链路；实体手机相机权限、二维码扫描和真实 Wi-Fi 体感仍需人工验收。
 
 ## 当前交付
 

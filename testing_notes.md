@@ -137,6 +137,26 @@ running Windows app and an Android device:
   It does not prove migration of a real non-empty old synced library, real
   camera scanning, same-Wi-Fi transfer or offline playback on a physical phone.
 
+## 2026-07-27 Emulator Cross-Process Sync Check
+
+- Started the fixed Windows release EXE and enabled its real Wi-Fi sync mode.
+- Confirmed the server listened on all IPv4 interfaces and advertised the
+  physical WLAN address `192.168.84.114`, not the `198.18.0.1` proxy adapter.
+- Used the Android app's manual paste fallback with the complete connection
+  payload and connected from `emulator-5554` to the running Windows EXE.
+- Android displayed the Windows playlist `新歌单` and synced the entire
+  one-song playlist.
+- Repeating the sync reused the existing matching local file: Android still
+  showed one song, one playlist and one audio file, with no duplicate record.
+- The Android private `.sync_staging` directory was empty after completion.
+- Closed Windows sync mode and confirmed its listening port was gone.
+- Closed the Windows EXE completely. Android retained audio focus, kept the
+  pause button visible and its playback slider continued advancing from the
+  local WAV file.
+- This proves the current executable and APK can complete the LAN transfer and
+  offline playback flow in the Android emulator. A physical phone is still
+  required for camera permission, QR scanning and real device Wi-Fi behavior.
+
 ## 当前自动覆盖
 
 Automated tests currently cover:

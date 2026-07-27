@@ -52,13 +52,14 @@ Windows 启动时会检查 `ffplay` 和 `ffprobe`。目标机器没有可用 `ff
 - Windows 同步服务与 Android 同步客户端的自动测试。
 - Android 强制中断前后残留恢复，以及真实磁盘旧数据库升级测试。
 - 2026-07-27 固定 Android APK 与本次构建文件 SHA-256 均为 `F56501F300A51BFBDCEC8D26B47F2FABBC1BD33946DE70A486F5EAB7A2392986`。
+- 正式 Windows EXE 与 Android 模拟器已完成真实跨进程连接、整张歌单同步、重复同步无重复落盘，以及 Windows 退出后的离线播放验证。
 
 ## 仍需真机确认
 
 - Windows 真实文件与文件夹选择器。
 - Android 相机权限和扫描 Windows 二维码。
-- 同一 Wi-Fi 下 Android 连接、整张歌单下载和同步结果显示。
-- 关闭 Windows 同步模式或断网后的 Android 离线播放。
+- 实体手机在同一 Wi-Fi 下连接、整张歌单下载和同步结果显示。
+- 关闭 Windows 同步模式或断网后的实体手机离线播放。
 
 ## V1 范围外
 
