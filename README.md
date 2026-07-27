@@ -66,7 +66,7 @@ Windows 启动时会检测 `ffplay` 和 `ffprobe`，结果显示在底部播放�
 D:\Android\Sdk\platform-tools\adb.exe -s emulator-5554 install -r D:\Projects\music_sync_player\release\android\music_sync_player_v1_debug.apk
 ```
 
-模拟器不方便扫描电脑屏幕时，在 Windows “Wi-Fi 同步”页点击“复制连接信息”，再在 Android “同步音乐”页展开“手动粘贴连接信息”。2026-07-27 已用正式 Windows EXE 与该模拟器完成真实连接、整张歌单同步、重复同步无重复落盘，以及 Windows 退出后的本地离线播放验证。
+模拟器不方便扫描电脑屏幕时，在 Windows “Wi-Fi 同步”页点击“复制连接信息”，再在 Android “同步音乐”页展开“手动粘贴连接信息”。2026-07-27 已用正式 Windows EXE 与该模拟器完成真实连接、整张歌单同步、重复同步无重复落盘、空歌单同步、电脑端删除歌单后的自动对账，以及 Windows 退出后的本地离线播放验证。
 
 ### 第一次 Wi-Fi 同步
 

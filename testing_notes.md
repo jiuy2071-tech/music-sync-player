@@ -153,9 +153,18 @@ running Windows app and an Android device:
 - Closed the Windows EXE completely. Android retained audio focus, kept the
   pause button visible and its playback slider continued advancing from the
   local WAV file.
+- Created `emulator_empty_playlist` with zero songs in the fixed Windows EXE.
+  Android showed both remote playlists, synced the empty playlist, and kept it
+  visible in the local playlist page without creating a song.
+- Deleted the temporary playlist in Windows while the real sync service was
+  running. On reconnect, Android reported that it removed one stale playlist
+  and zero orphaned cache files.
+- After reconciliation, Android still showed the original `新歌单` and
+  `回声_master`; its private WAV remained exactly 37,446,236 bytes.
 - This proves the current executable and APK can complete the LAN transfer and
-  offline playback flow in the Android emulator. A physical phone is still
-  required for camera permission, QR scanning and real device Wi-Fi behavior.
+  offline playback flow, empty-playlist sync and authoritative deletion
+  reconciliation in the Android emulator. A physical phone is still required
+  for camera permission, QR scanning and real device Wi-Fi behavior.
 
 ## 当前自动覆盖
 
