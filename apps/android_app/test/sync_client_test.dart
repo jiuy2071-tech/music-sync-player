@@ -439,6 +439,93 @@ void main() {
       expect(database.songs.findById('shared-song'), isNull);
     },
   );
+
+  test(
+    'startup recovery restores old file after an uncommitted replacement',
+    () async {
+      final library = AndroidMusicLibraryLocation(rootPath: tempDir.path);
+      await library.ensureReady();
+      final targetFile = File(p.join(library.audioPath, 'song-1.mp3'));
+      await targetFile.writeAsBytes([9, 9, 9]);
+      final operationDirectory = await _writeRecoveryJournal(
+        library: library,
+        operationId: 'playlist-1_100',
+        targetName: 'song-1.mp3',
+        hadOriginal: true,
+        backupBytes: [1, 1, 1],
+      );
+
+      final result = await AndroidSyncClient.recoverInterruptedSyncs(
+        database: database,
+        library: library,
+      );
+
+      expect(result.restoredOperationCount, 1);
+      expect(result.completedOperationCount, 0);
+      expect(result.failureMessages, isEmpty);
+      expect(await targetFile.readAsBytes(), [1, 1, 1]);
+      expect(await operationDirectory.exists(), isFalse);
+    },
+  );
+
+  test(
+    'startup recovery removes a new file from an uncommitted replacement',
+    () async {
+      final library = AndroidMusicLibraryLocation(rootPath: tempDir.path);
+      await library.ensureReady();
+      final targetFile = File(p.join(library.audioPath, 'song-1.mp3'));
+      await targetFile.writeAsBytes([9, 9, 9]);
+      await _writeRecoveryJournal(
+        library: library,
+        operationId: 'playlist-1_101',
+        targetName: 'song-1.mp3',
+        hadOriginal: false,
+      );
+
+      final result = await AndroidSyncClient.recoverInterruptedSyncs(
+        database: database,
+        library: library,
+      );
+
+      expect(result.restoredOperationCount, 1);
+      expect(result.failureMessages, isEmpty);
+      expect(await targetFile.exists(), isFalse);
+    },
+  );
+
+  test(
+    'startup recovery keeps files whose database transaction committed',
+    () async {
+      final library = AndroidMusicLibraryLocation(rootPath: tempDir.path);
+      await library.ensureReady();
+      const operationId = 'playlist-1_102';
+      final targetFile = File(p.join(library.audioPath, 'song-1.mp3'));
+      await targetFile.writeAsBytes([9, 9, 9]);
+      final operationDirectory = await _writeRecoveryJournal(
+        library: library,
+        operationId: operationId,
+        targetName: 'song-1.mp3',
+        hadOriginal: true,
+        backupBytes: [1, 1, 1],
+      );
+      database.sync.markOperationCommitted(
+        operationId,
+        DateTime.utc(2026, 7, 27),
+      );
+
+      final result = await AndroidSyncClient.recoverInterruptedSyncs(
+        database: database,
+        library: library,
+      );
+
+      expect(result.restoredOperationCount, 0);
+      expect(result.completedOperationCount, 1);
+      expect(result.failureMessages, isEmpty);
+      expect(await targetFile.readAsBytes(), [9, 9, 9]);
+      expect(await operationDirectory.exists(), isFalse);
+      expect(database.sync.isOperationCommitted(operationId), isFalse);
+    },
+  );
 }
 
 Future<PlaylistSyncResult> _syncRemotePlaylist({
@@ -529,6 +616,39 @@ Future<File> _seedLocalPlaylist({
     syncedAt: DateTime.utc(2026, 7, 8),
   );
   return file;
+}
+
+Future<Directory> _writeRecoveryJournal({
+  required AndroidMusicLibraryLocation library,
+  required String operationId,
+  required String targetName,
+  required bool hadOriginal,
+  List<int>? backupBytes,
+}) async {
+  final operationDirectory = Directory(
+    p.join(library.rootPath, '.sync_staging', operationId),
+  );
+  await operationDirectory.create(recursive: true);
+  await File(p.join(operationDirectory.path, 'journal.json')).writeAsString(
+    jsonEncode({
+      'operation_id': operationId,
+      'replacements': [
+        {
+          'target_name': targetName,
+          'backup_name': '0.backup',
+          'had_original': hadOriginal,
+        },
+      ],
+    }),
+  );
+  if (backupBytes != null) {
+    final backupFile = File(
+      p.join(operationDirectory.path, 'backups', '0.backup'),
+    );
+    await backupFile.parent.create(recursive: true);
+    await backupFile.writeAsBytes(backupBytes);
+  }
+  return operationDirectory;
 }
 
 Song _song({

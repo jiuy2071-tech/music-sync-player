@@ -123,8 +123,8 @@ running Windows app and an Android device:
   unchanged.
 - Close Windows sync mode or disconnect Wi-Fi and confirm Android still plays
   already-synced files offline.
-- Upgrade an Android installation that already contains a non-empty old-format
-  synced library and confirm its playlists are migrated without data loss.
+- Install the new APK over a physical Android device that already contains
+  synced content and confirm the retained songs still play.
 
 ## 2026-07-26 Emulator Upgrade Check
 
@@ -154,3 +154,6 @@ Automated tests currently cover:
 - Atomic download rollback, storage preflight, finite network retry, playlist
   version matching, empty snapshots, authoritative deletion reconciliation,
   reference-aware orphan cleanup and Windows playback capability detection.
+- Startup recovery after a forced stop before or after the SQLite commit marker.
+- Real on-disk old-schema database upgrade with non-empty songs, playlists,
+  playlist items and sync cache retained.

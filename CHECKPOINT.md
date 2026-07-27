@@ -22,12 +22,15 @@ D:\Projects\music_sync_player
 - 2026-07-26 Android `flutter analyze`、完整 `flutter test` 和 `flutter build apk --debug` 已通过。
 - 2026-07-26 Windows `flutter analyze`、完整 `flutter test` 和 `flutter build windows` 已通过；Windows 完整运行目录和 Android APK 均已更新。
 - 2026-07-26 Windows 已增加启动播放能力检测，缺少 `ffplay` 或 `ffprobe` 时会在底部播放器显示明确状态。
-- 2026-07-26 最新 Android APK 已在模拟器保留数据覆盖安装并正常启动，无启动崩溃；真实非空旧库迁移仍需实体场景确认。
+- 2026-07-26 最新 Android APK 已在模拟器保留数据覆盖安装并正常启动，无启动崩溃；实体手机覆盖安装后的显示与播放仍需人工确认。
+- 2026-07-27 Android 已增加同步强制中断恢复清单与 SQLite 提交标记；APP 重启会自动恢复未提交的旧文件，或清理已提交事务留下的备份。
+- 2026-07-27 真实磁盘旧数据库升级自动测试已通过，原有歌曲、歌单、成员关系和同步状态可保留。
+- 2026-07-27 Android `flutter analyze`、14 项测试和 `flutter build apk --debug` 已通过；数据库 `flutter analyze` 与 10 项测试已通过；固定 APK 已更新。
 - `manual_test_audio/` 是项目内生成的非敏感样本，已被 Git 忽略，不能提交。
 
 ## 下一步
 
-自动代码安全项和 Windows 播放能力检测已经闭环。下一步进行真机断网、旧数据库升级、重复同步、电脑端删除、空歌单和离线播放回归。详细设计与负面测试见 `docs\sync_safety_plan.md`。保持 V1 范围，不扩展云同步、远程播放或 Android 主库编辑。
+自动代码安全项、旧数据库结构升级测试和 Windows 播放能力检测已经闭环。下一步进行真机断网、重复同步、电脑端删除、空歌单和离线播放回归。详细设计与负面测试见 `docs\sync_safety_plan.md`。保持 V1 范围，不扩展云同步、远程播放或 Android 主库编辑。
 
 ## 环境与交付注意事项
 

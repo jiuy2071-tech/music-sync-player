@@ -32,6 +32,7 @@ class MusicDatabase {
     db.execute(_createPlaylistItemsTable);
     db.execute(_createSyncCacheTable);
     db.execute(_createSyncedPlaylistsTable);
+    db.execute(_createSyncOperationsTable);
     db.execute(_createIndexes);
     db.execute(_bootstrapSyncedPlaylists);
   }
@@ -336,6 +337,39 @@ class SyncRepository {
     );
     return result.map(Song.fromMap).toList();
   }
+
+  void markOperationCommitted(String operationId, DateTime committedAt) {
+    _db.execute(
+      '''
+      INSERT INTO sync_operations (operation_id, committed_at)
+      VALUES (?, ?)
+      ON CONFLICT(operation_id) DO UPDATE SET
+        committed_at = excluded.committed_at
+      ''',
+      [operationId, committedAt.toIso8601String()],
+    );
+  }
+
+  bool isOperationCommitted(String operationId) {
+    final result = _db.select(
+      'SELECT 1 FROM sync_operations WHERE operation_id = ? LIMIT 1',
+      [operationId],
+    );
+    return result.isNotEmpty;
+  }
+
+  List<String> committedOperationIds() {
+    final result = _db.select(
+      'SELECT operation_id FROM sync_operations ORDER BY committed_at',
+    );
+    return result.map((row) => row['operation_id']! as String).toList();
+  }
+
+  void removeCommittedOperation(String operationId) {
+    _db.execute('DELETE FROM sync_operations WHERE operation_id = ?', [
+      operationId,
+    ]);
+  }
 }
 
 class SearchRepository {
@@ -483,6 +517,13 @@ CREATE TABLE IF NOT EXISTS synced_playlists (
 );
 ''';
 
+const _createSyncOperationsTable = '''
+CREATE TABLE IF NOT EXISTS sync_operations (
+  operation_id TEXT PRIMARY KEY,
+  committed_at TEXT NOT NULL
+);
+''';
+
 const _bootstrapSyncedPlaylists = '''
 INSERT OR IGNORE INTO synced_playlists (
   playlist_id, source_version, synced_at
@@ -508,4 +549,6 @@ CREATE INDEX IF NOT EXISTS idx_sync_cache_song ON sync_cache(song_id);
 CREATE INDEX IF NOT EXISTS idx_sync_cache_status ON sync_cache(status);
 CREATE INDEX IF NOT EXISTS idx_synced_playlists_synced_at
   ON synced_playlists(synced_at);
+CREATE INDEX IF NOT EXISTS idx_sync_operations_committed_at
+  ON sync_operations(committed_at);
 ''';

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:music_core/music_core.dart';
 import 'package:music_database/music_database.dart';
@@ -198,6 +200,68 @@ void main() {
 
     database.playlists.deletePlaylist(second.id);
     expect(database.sync.unreferencedSyncedSongs().single.id, song.id);
+  });
+
+  test('opens and upgrades an older on-disk database without losing data', () {
+    final tempDirectory = Directory.systemTemp.createTempSync(
+      'oneplus_database_upgrade_',
+    );
+    final databasePath = '${tempDirectory.path}${Platform.pathSeparator}old.db';
+    MusicDatabase? legacyDatabase;
+    MusicDatabase? upgradedDatabase;
+    try {
+      legacyDatabase = MusicDatabase.open(databasePath);
+      final song = _song(id: 'legacy-song', title: 'Legacy Song');
+      final playlist = _playlist(
+        id: 'legacy-playlist',
+        name: 'Legacy Playlist',
+      );
+      legacyDatabase.songs.upsert(song);
+      legacyDatabase.playlists.upsert(playlist);
+      legacyDatabase.playlists.addSong(
+        item: _playlistItem(
+          id: 'legacy-item',
+          playlistId: playlist.id,
+          songId: song.id,
+        ),
+      );
+      legacyDatabase.sync.upsertCacheEntry(
+        SyncCacheEntry(
+          id: 'legacy-cache',
+          songId: song.id,
+          playlistId: playlist.id,
+          localCachePath: song.localPath,
+          fileHash: song.fileHash,
+          status: SyncCacheStatus.synced,
+          syncedAt: DateTime.utc(2026, 7, 18),
+        ),
+      );
+      legacyDatabase.db.execute('DROP TABLE synced_playlists');
+      legacyDatabase.db.execute('DROP TABLE sync_operations');
+      legacyDatabase.close();
+      legacyDatabase = null;
+
+      upgradedDatabase = MusicDatabase.open(databasePath);
+
+      expect(upgradedDatabase.songs.findById(song.id)?.title, song.title);
+      expect(
+        upgradedDatabase.playlists.songsForPlaylist(playlist.id).single.id,
+        song.id,
+      );
+      expect(
+        upgradedDatabase.search.searchPlaylists('', syncedOnly: true).single.id,
+        playlist.id,
+      );
+      expect(
+        upgradedDatabase.sync.playlistSourceVersion(playlist.id),
+        'legacy',
+      );
+      expect(upgradedDatabase.sync.committedOperationIds(), isEmpty);
+    } finally {
+      legacyDatabase?.close();
+      upgradedDatabase?.close();
+      tempDirectory.deleteSync(recursive: true);
+    }
   });
 }
 

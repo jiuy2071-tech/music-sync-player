@@ -76,6 +76,18 @@ class PlaylistSyncResult {
   bool get hasFailures => failedCount > 0;
 }
 
+class SyncRecoveryResult {
+  const SyncRecoveryResult({
+    required this.restoredOperationCount,
+    required this.completedOperationCount,
+    required this.failureMessages,
+  });
+
+  final int restoredOperationCount;
+  final int completedOperationCount;
+  final List<String> failureMessages;
+}
+
 class AndroidSyncClient {
   AndroidSyncClient({
     HttpClient? httpClient,
@@ -95,6 +107,98 @@ class AndroidSyncClient {
   final AvailableBytesProvider _availableBytesProvider;
   final Duration _networkTimeout;
   final int _maxNetworkAttempts;
+
+  static Future<SyncRecoveryResult> recoverInterruptedSyncs({
+    required MusicDatabase database,
+    required AndroidMusicLibraryLocation library,
+  }) async {
+    final stagingRoot = Directory(p.join(library.rootPath, '.sync_staging'));
+    if (!await stagingRoot.exists()) {
+      for (final operationId in database.sync.committedOperationIds()) {
+        database.sync.removeCommittedOperation(operationId);
+      }
+      return const SyncRecoveryResult(
+        restoredOperationCount: 0,
+        completedOperationCount: 0,
+        failureMessages: [],
+      );
+    }
+
+    var restoredCount = 0;
+    var completedCount = 0;
+    final failures = <String>[];
+    final foundOperationIds = <String>{};
+    await for (final entity in stagingRoot.list(followLinks: false)) {
+      if (entity is! Directory) {
+        continue;
+      }
+      final operationId = p.basename(entity.path);
+      foundOperationIds.add(operationId);
+      try {
+        _requireSafeOperationId(operationId);
+        final journalFile = File(p.join(entity.path, 'journal.json'));
+        if (!await journalFile.exists()) {
+          await entity.delete(recursive: true);
+          database.sync.removeCommittedOperation(operationId);
+          continue;
+        }
+
+        final journal = _SyncJournal.fromJson(
+          jsonDecode(await journalFile.readAsString()) as Map<String, Object?>,
+        );
+        if (journal.operationId != operationId) {
+          throw const FormatException('同步恢复记录与临时目录不一致');
+        }
+
+        if (database.sync.isOperationCommitted(operationId)) {
+          await entity.delete(recursive: true);
+          database.sync.removeCommittedOperation(operationId);
+          completedCount++;
+          continue;
+        }
+
+        for (final entry in journal.replacements.reversed) {
+          _requireSafeAudioFileName(entry.targetName);
+          _requireSafeBackupName(entry.backupName);
+          final targetFile = File(p.join(library.audioPath, entry.targetName));
+          final backupFile = File(
+            p.join(entity.path, 'backups', entry.backupName),
+          );
+          _requirePathWithin(library.audioPath, targetFile.path);
+          _requirePathWithin(entity.path, backupFile.path);
+
+          if (await backupFile.exists()) {
+            if (await targetFile.exists()) {
+              await targetFile.delete();
+            }
+            await targetFile.parent.create(recursive: true);
+            await backupFile.rename(targetFile.path);
+          } else if (!entry.hadOriginal && await targetFile.exists()) {
+            await targetFile.delete();
+          }
+        }
+        await entity.delete(recursive: true);
+        database.sync.removeCommittedOperation(operationId);
+        restoredCount++;
+      } catch (error) {
+        failures.add('$operationId：$error');
+      }
+    }
+
+    for (final operationId in database.sync.committedOperationIds()) {
+      if (!foundOperationIds.contains(operationId)) {
+        database.sync.removeCommittedOperation(operationId);
+      }
+    }
+    if (await stagingRoot.exists() && await stagingRoot.list().isEmpty) {
+      await stagingRoot.delete();
+    }
+    return SyncRecoveryResult(
+      restoredOperationCount: restoredCount,
+      completedOperationCount: completedCount,
+      failureMessages: failures,
+    );
+  }
 
   Future<void> connect(SyncQrPayload payload) async {
     final response = await _postJson(_uri(payload, '/connect'), {
@@ -192,12 +296,10 @@ class AndroidSyncClient {
     final songJsonList = (manifest['songs']! as List)
         .cast<Map<String, Object?>>();
     final songIds = <String>{};
+    final operationId =
+        '${playlist.id}_${DateTime.now().microsecondsSinceEpoch}';
     final stagingDirectory = Directory(
-      p.join(
-        library.rootPath,
-        '.sync_staging',
-        '${playlist.id}_${DateTime.now().microsecondsSinceEpoch}',
-      ),
+      p.join(library.rootPath, '.sync_staging', operationId),
     );
 
     final preparedSongs = <_PreparedSong>[];
@@ -331,6 +433,42 @@ class AndroidSyncClient {
         }
       }
 
+      final replacementPlans = <_ReplacementPlan>[];
+      for (var index = 0; index < preparedSongs.length; index++) {
+        final prepared = preparedSongs[index];
+        final stagedFile = prepared.stagedFile;
+        if (stagedFile == null) {
+          continue;
+        }
+        final targetName = p.basename(prepared.targetFile.path);
+        _requireSafeAudioFileName(targetName);
+        replacementPlans.add(
+          _ReplacementPlan(
+            stagedFile: stagedFile,
+            targetFile: prepared.targetFile,
+            backupFile: File(
+              p.join(stagingDirectory.path, 'backups', '$index.backup'),
+            ),
+            hadOriginal: await prepared.targetFile.exists(),
+          ),
+        );
+      }
+      final journal = _SyncJournal(
+        operationId: operationId,
+        replacements: replacementPlans
+            .map(
+              (plan) => _SyncJournalEntry(
+                targetName: p.basename(plan.targetFile.path),
+                backupName: p.basename(plan.backupFile.path),
+                hadOriginal: plan.hadOriginal,
+              ),
+            )
+            .toList(),
+      );
+      await File(
+        p.join(stagingDirectory.path, 'journal.json'),
+      ).writeAsString(jsonEncode(journal.toJson()), flush: true);
+
       final replacements = <_AppliedReplacement>[];
       try {
         await database.transaction<void>(() async {
@@ -346,22 +484,13 @@ class AndroidSyncClient {
             sourceVersion: playlistVersion,
             syncedAt: DateTime.now().toUtc(),
           );
-          for (var index = 0; index < preparedSongs.length; index++) {
-            final prepared = preparedSongs[index];
-            final stagedFile = prepared.stagedFile;
-            if (stagedFile == null) {
-              continue;
-            }
-            await _replaceFile(
-              stagedFile: stagedFile,
-              targetFile: prepared.targetFile,
-              backupDirectory: Directory(
-                p.join(stagingDirectory.path, 'backups'),
-              ),
-              backupIndex: index,
-              replacements: replacements,
-            );
+          for (final plan in replacementPlans) {
+            await _replaceFile(plan: plan, replacements: replacements);
           }
+          database.sync.markOperationCommitted(
+            operationId,
+            DateTime.now().toUtc(),
+          );
         });
       } catch (error, stackTrace) {
         try {
@@ -374,6 +503,13 @@ class AndroidSyncClient {
           );
         }
         Error.throwWithStackTrace(error, stackTrace);
+      }
+
+      try {
+        await stagingDirectory.delete(recursive: true);
+        database.sync.removeCommittedOperation(operationId);
+      } catch (_) {
+        preserveStaging = true;
       }
 
       final cleanup = await _cleanupOrphanedSongs(database, library);
@@ -620,6 +756,84 @@ class _AppliedReplacement {
   final File? backupFile;
 }
 
+class _ReplacementPlan {
+  const _ReplacementPlan({
+    required this.stagedFile,
+    required this.targetFile,
+    required this.backupFile,
+    required this.hadOriginal,
+  });
+
+  final File stagedFile;
+  final File targetFile;
+  final File backupFile;
+  final bool hadOriginal;
+}
+
+class _SyncJournal {
+  const _SyncJournal({required this.operationId, required this.replacements});
+
+  factory _SyncJournal.fromJson(Map<String, Object?> json) {
+    final operationId = json['operation_id'];
+    final replacements = json['replacements'];
+    if (operationId is! String || replacements is! List) {
+      throw const FormatException('同步恢复记录格式无效');
+    }
+    return _SyncJournal(
+      operationId: operationId,
+      replacements: replacements
+          .map(
+            (entry) => _SyncJournalEntry.fromJson(
+              (entry as Map).cast<String, Object?>(),
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  final String operationId;
+  final List<_SyncJournalEntry> replacements;
+
+  Map<String, Object?> toJson() => {
+    'operation_id': operationId,
+    'replacements': replacements.map((entry) => entry.toJson()).toList(),
+  };
+}
+
+class _SyncJournalEntry {
+  const _SyncJournalEntry({
+    required this.targetName,
+    required this.backupName,
+    required this.hadOriginal,
+  });
+
+  factory _SyncJournalEntry.fromJson(Map<String, Object?> json) {
+    final targetName = json['target_name'];
+    final backupName = json['backup_name'];
+    final hadOriginal = json['had_original'];
+    if (targetName is! String ||
+        backupName is! String ||
+        hadOriginal is! bool) {
+      throw const FormatException('同步恢复文件记录格式无效');
+    }
+    return _SyncJournalEntry(
+      targetName: targetName,
+      backupName: backupName,
+      hadOriginal: hadOriginal,
+    );
+  }
+
+  final String targetName;
+  final String backupName;
+  final bool hadOriginal;
+
+  Map<String, Object?> toJson() => {
+    'target_name': targetName,
+    'backup_name': backupName,
+    'had_original': hadOriginal,
+  };
+}
+
 class _OrphanCleanupResult {
   const _OrphanCleanupResult({
     required this.removedCount,
@@ -631,24 +845,25 @@ class _OrphanCleanupResult {
 }
 
 Future<void> _replaceFile({
-  required File stagedFile,
-  required File targetFile,
-  required Directory backupDirectory,
-  required int backupIndex,
+  required _ReplacementPlan plan,
   required List<_AppliedReplacement> replacements,
 }) async {
-  await targetFile.parent.create(recursive: true);
+  await plan.targetFile.parent.create(recursive: true);
   File? backupFile;
-  if (await targetFile.exists()) {
-    await backupDirectory.create(recursive: true);
-    backupFile = File(p.join(backupDirectory.path, '$backupIndex.backup'));
-    await targetFile.rename(backupFile.path);
+  final targetExists = await plan.targetFile.exists();
+  if (targetExists != plan.hadOriginal) {
+    throw const AppError('sync_local_file_changed', '本地缓存文件在同步期间发生变化，请重试');
+  }
+  if (targetExists) {
+    await plan.backupFile.parent.create(recursive: true);
+    backupFile = plan.backupFile;
+    await plan.targetFile.rename(backupFile.path);
   }
 
   replacements.add(
-    _AppliedReplacement(targetFile: targetFile, backupFile: backupFile),
+    _AppliedReplacement(targetFile: plan.targetFile, backupFile: backupFile),
   );
-  await stagedFile.rename(targetFile.path);
+  await plan.stagedFile.rename(plan.targetFile.path);
 }
 
 Future<void> _restoreReplacements(
@@ -668,6 +883,24 @@ Future<void> _restoreReplacements(
 void _requireSafeId(String value, String field) {
   if (!RegExp(r'^[A-Za-z0-9_-]{1,128}$').hasMatch(value)) {
     throw AppError('sync_manifest_invalid', '同步清单中的 $field ID 不安全');
+  }
+}
+
+void _requireSafeOperationId(String value) {
+  if (!RegExp(r'^[A-Za-z0-9_-]{1,180}$').hasMatch(value)) {
+    throw const FormatException('同步临时目录名称无效');
+  }
+}
+
+void _requireSafeAudioFileName(String value) {
+  if (!RegExp(r'^[A-Za-z0-9_-]{1,128}\.(mp3|flac|m4a|wav)$').hasMatch(value)) {
+    throw const FormatException('同步恢复目标文件名无效');
+  }
+}
+
+void _requireSafeBackupName(String value) {
+  if (!RegExp(r'^\d+\.backup$').hasMatch(value)) {
+    throw const FormatException('同步恢复备份文件名无效');
   }
 }
 
