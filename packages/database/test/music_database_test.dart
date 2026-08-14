@@ -138,6 +138,19 @@ void main() {
     expect(result.single.id, 'playlist-1');
   });
 
+  test('search treats percent and underscore as literal characters', () {
+    database.songs.upsert(_song(id: 'song-1', title: 'My 50% Mix'));
+    database.songs.upsert(_song(id: 'song-2', title: 'a_b song'));
+    database.songs.upsert(_song(id: 'song-3', title: 'My 50X Mix'));
+    database.songs.upsert(_song(id: 'song-4', title: 'aXb song'));
+
+    final percent = database.search.searchSongs('50%');
+    expect(percent.map((song) => song.id), ['song-1']);
+
+    final underscore = database.search.searchSongs('a_b');
+    expect(underscore.map((song) => song.id), ['song-2']);
+  });
+
   test('transaction rolls back all database changes after a failure', () async {
     final playlist = _playlist(id: 'playlist-1', name: 'Before');
     database.playlists.upsert(playlist);

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:audioplayers/audioplayers.dart';
 import 'package:music_core/music_core.dart';
 
@@ -14,7 +16,23 @@ class AndroidAudioPlayer {
   Stream<bool> get playingStream =>
       _player.onPlayerStateChanged.map((state) => state == PlayerState.playing);
 
+  /// Surfaces playback failures that happen after a track starts, since
+  /// audioplayers reports them through its log stream rather than as errors
+  /// on the play() future.
+  Stream<String> get errorStream => _player.eventStream
+      .where(
+        (event) =>
+            event.eventType == AudioEventType.log &&
+            event.logMessage != null &&
+            _looksLikePlaybackError(event.logMessage!),
+      )
+      .map((event) => event.logMessage!);
+
   Future<void> play(Song song) async {
+    final file = File(song.localPath);
+    if (!await file.exists()) {
+      throw AppError('audio_file_missing', '本地音频文件不存在：${song.localPath}');
+    }
     await _player.stop();
     await _player.play(DeviceFileSource(song.localPath));
     _currentSong = song;
@@ -34,4 +52,11 @@ class AndroidAudioPlayer {
   }
 
   Future<void> dispose() => _player.dispose();
+}
+
+bool _looksLikePlaybackError(String message) {
+  final lower = message.toLowerCase();
+  return lower.contains('error') ||
+      lower.contains('fail') ||
+      lower.contains('exception');
 }

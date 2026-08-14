@@ -385,19 +385,19 @@ class SearchRepository {
           INNER JOIN sync_cache ON sync_cache.song_id = songs.id
           WHERE sync_cache.status = ?
             AND (
-              songs.title LIKE ? OR
-              songs.artist LIKE ? OR
-              songs.album LIKE ? OR
-              songs.original_file_name LIKE ?
+              songs.title LIKE ? ESCAPE '\\' OR
+              songs.artist LIKE ? ESCAPE '\\' OR
+              songs.album LIKE ? ESCAPE '\\' OR
+              songs.original_file_name LIKE ? ESCAPE '\\'
             )
           ORDER BY songs.title
           '''
         : '''
           SELECT * FROM songs
-          WHERE title LIKE ?
-             OR artist LIKE ?
-             OR album LIKE ?
-             OR original_file_name LIKE ?
+          WHERE title LIKE ? ESCAPE '\\'
+             OR artist LIKE ? ESCAPE '\\'
+             OR album LIKE ? ESCAPE '\\'
+             OR original_file_name LIKE ? ESCAPE '\\'
           ORDER BY title
           ''';
     final args = syncedOnly
@@ -414,12 +414,12 @@ class SearchRepository {
           SELECT playlists.* FROM playlists
           INNER JOIN synced_playlists
             ON synced_playlists.playlist_id = playlists.id
-          WHERE playlists.name LIKE ?
+          WHERE playlists.name LIKE ? ESCAPE '\\'
           ORDER BY playlists.sort_order, playlists.name
           '''
         : '''
           SELECT * FROM playlists
-          WHERE name LIKE ?
+          WHERE name LIKE ? ESCAPE '\\'
           ORDER BY sort_order, name
           ''';
     final args = [pattern];

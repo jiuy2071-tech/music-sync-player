@@ -112,6 +112,7 @@ class AndroidSyncClient {
     required MusicDatabase database,
     required AndroidMusicLibraryLocation library,
   }) async {
+    await _cleanupStaleTrash(library);
     final stagingRoot = Directory(p.join(library.rootPath, '.sync_staging'));
     if (!await stagingRoot.exists()) {
       for (final operationId in database.sync.committedOperationIds()) {
@@ -198,6 +199,22 @@ class AndroidSyncClient {
       completedOperationCount: completedCount,
       failureMessages: failures,
     );
+  }
+
+  static Future<void> _cleanupStaleTrash(
+    AndroidMusicLibraryLocation library,
+  ) async {
+    // Files in .sync_trash are either already unlinked from the database or
+    // will simply be re-downloaded on the next sync, so dropping them during
+    // startup recovery is always safe.
+    final trashDirectory = Directory(p.join(library.rootPath, '.sync_trash'));
+    try {
+      if (await trashDirectory.exists()) {
+        await trashDirectory.delete(recursive: true);
+      }
+    } catch (_) {
+      // Best effort: a stale trash file only consumes space.
+    }
   }
 
   Future<void> connect(SyncQrPayload payload) async {

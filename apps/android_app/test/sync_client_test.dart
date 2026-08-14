@@ -526,6 +526,25 @@ void main() {
       expect(database.sync.isOperationCommitted(operationId), isFalse);
     },
   );
+
+  test('startup recovery clears stale orphan trash files', () async {
+    final library = AndroidMusicLibraryLocation(rootPath: tempDir.path);
+    await library.ensureReady();
+    final trashDirectory = Directory(p.join(library.rootPath, '.sync_trash'));
+    final stale = File(p.join(trashDirectory.path, '1234_0.trash'));
+    await trashDirectory.create(recursive: true);
+    await stale.writeAsBytes([7, 7, 7]);
+
+    final result = await AndroidSyncClient.recoverInterruptedSyncs(
+      database: database,
+      library: library,
+    );
+
+    expect(result.restoredOperationCount, 0);
+    expect(result.completedOperationCount, 0);
+    expect(result.failureMessages, isEmpty);
+    expect(await trashDirectory.exists(), isFalse);
+  });
 }
 
 Future<PlaylistSyncResult> _syncRemotePlaylist({

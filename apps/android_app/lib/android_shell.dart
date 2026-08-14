@@ -113,6 +113,7 @@ class _AndroidHomePageState extends State<_AndroidHomePage> {
   StreamSubscription<Duration>? _durationSubscription;
   StreamSubscription<bool>? _playingSubscription;
   StreamSubscription<void>? _completeSubscription;
+  StreamSubscription<String>? _errorSubscription;
 
   @override
   void initState() {
@@ -135,6 +136,7 @@ class _AndroidHomePageState extends State<_AndroidHomePage> {
       }
     });
     _completeSubscription = _player.completeStream.listen((_) => _playNext());
+    _errorSubscription = _player.errorStream.listen(_handlePlaybackError);
     _reloadLocal();
   }
 
@@ -146,6 +148,7 @@ class _AndroidHomePageState extends State<_AndroidHomePage> {
     _durationSubscription?.cancel();
     _playingSubscription?.cancel();
     _completeSubscription?.cancel();
+    _errorSubscription?.cancel();
     _payloadController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -459,6 +462,21 @@ class _AndroidHomePageState extends State<_AndroidHomePage> {
         setState(() => _status = '删除本地缓存失败：$error');
       }
     }
+  }
+
+  void _handlePlaybackError(String message) {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      if (_nowPlaying != null) {
+        _nowPlaying = null;
+        _isPlaying = false;
+        _playbackPosition = Duration.zero;
+        _playbackDuration = Duration.zero;
+      }
+      _status = '播放失败：$message';
+    });
   }
 
   void _openNowPlaying() {

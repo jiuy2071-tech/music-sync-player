@@ -59,8 +59,6 @@ class AudioImportService {
           library.audioPath,
           '$songId.${format.extension}',
         );
-        await file.copy(targetPath);
-
         final stat = await file.stat();
         final now = DateTime.now().toUtc();
         final song = Song(
@@ -79,8 +77,18 @@ class AudioImportService {
           createdAt: now,
           updatedAt: now,
         );
-
-        database.songs.upsert(song);
+        await file.copy(targetPath);
+        try {
+          database.songs.upsert(song);
+        } catch (_) {
+          // Do not leave an unreferenced copy behind when the database write
+          // fails; the Windows side has no orphan sweep for imported files.
+          final copied = File(targetPath);
+          if (await copied.exists()) {
+            await copied.delete().catchError((_) => copied);
+          }
+          rethrow;
+        }
         imported.add(song);
       } catch (error) {
         failed.add(ImportFailedFile(path: path, message: error.toString()));
@@ -216,23 +224,66 @@ Future<SongMetadata> _readMp3Id3v2Metadata(File file) async {
       return const SongMetadata();
     }
 
+    // Only v2.3 and v2.4 frame layouts are handled. v2.2 uses 3-byte frame
+    // IDs and is old enough that V1 does not need it.
+    final major = header[3];
+    if (major != 3 && major != 4) {
+      return const SongMetadata();
+    }
+    final flags = header[5];
     final tagSize = _syncSafeInt(header.sublist(6, 10));
-    final bytes = await raf.read(tagSize);
+    List<int> bytes = await raf.read(tagSize);
+    if ((flags & 0x80) != 0) {
+      bytes = _deUnsynchronize(bytes);
+    }
+
     var offset = 0;
+    if ((flags & 0x40) != 0) {
+      // Skip the extended header so its bytes are not misread as frames.
+      if (major == 4) {
+        if (bytes.length < 4) {
+          return const SongMetadata();
+        }
+        // v2.4 extended header size includes its own 4 size bytes.
+        offset = _syncSafeInt(bytes.sublist(0, 4));
+      } else {
+        if (bytes.length < 6) {
+          return const SongMetadata();
+        }
+        // v2.3 extended header size excludes its own 4 size bytes.
+        final extSize =
+            (bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3];
+        offset = 4 + extSize;
+      }
+    }
+
     String? title;
     String? artist;
     String? album;
-
-    while (offset + 10 <= bytes.length) {
-      final frameId = ascii.decode(
-        bytes.sublist(offset, offset + 4),
-        allowInvalid: true,
-      );
-      final frameSize = _frameSize(bytes.sublist(offset + 4, offset + 8));
-      if (frameSize <= 0 || offset + 10 + frameSize > bytes.length) {
+    // v2.3 and v2.4 frames both carry a 10-byte header
+    // (4 ID + 4 size + 2 flags); only the size encoding differs.
+    const frameHeaderSize = 10;
+    while (offset + frameHeaderSize <= bytes.length) {
+      final frameIdBytes = bytes.sublist(offset, offset + 4);
+      if (!_isValidFrameId(frameIdBytes)) {
         break;
       }
-      final frame = bytes.sublist(offset + 10, offset + 10 + frameSize);
+      final frameId = ascii.decode(frameIdBytes);
+      final sizeBytes = bytes.sublist(offset + 4, offset + 8);
+      final frameSize = major == 4
+          ? _syncSafeInt(sizeBytes)
+          : (sizeBytes[0] << 24) |
+                (sizeBytes[1] << 16) |
+                (sizeBytes[2] << 8) |
+                sizeBytes[3];
+      if (frameSize <= 0 ||
+          offset + frameHeaderSize + frameSize > bytes.length) {
+        break;
+      }
+      final frame = bytes.sublist(
+        offset + frameHeaderSize,
+        offset + frameHeaderSize + frameSize,
+      );
       final text = _decodeTextFrame(frame);
       switch (frameId) {
         case 'TIT2':
@@ -245,7 +296,7 @@ Future<SongMetadata> _readMp3Id3v2Metadata(File file) async {
           album = text;
           break;
       }
-      offset += 10 + frameSize;
+      offset += frameHeaderSize + frameSize;
     }
 
     return SongMetadata(
@@ -264,8 +315,36 @@ int _syncSafeInt(List<int> bytes) {
   return (bytes[0] << 21) | (bytes[1] << 14) | (bytes[2] << 7) | bytes[3];
 }
 
-int _frameSize(List<int> bytes) {
-  return (bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3];
+/// Removes ID3v2 unsynchronisation (0xFF 0x00 -> 0xFF) from tag bytes.
+List<int> _deUnsynchronize(List<int> bytes) {
+  if (bytes.length < 2) {
+    return bytes;
+  }
+  final result = <int>[];
+  for (var index = 0; index < bytes.length; index++) {
+    result.add(bytes[index]);
+    if (bytes[index] == 0xFF &&
+        index + 1 < bytes.length &&
+        bytes[index + 1] == 0x00) {
+      index++;
+    }
+  }
+  return result;
+}
+
+/// v2.3/v2.4 frame IDs are exactly four characters from A-Z or 0-9.
+bool _isValidFrameId(List<int> bytes) {
+  if (bytes.length != 4) {
+    return false;
+  }
+  for (final byte in bytes) {
+    final isLetter = byte >= 0x41 && byte <= 0x5A;
+    final isDigit = byte >= 0x30 && byte <= 0x39;
+    if (!isLetter && !isDigit) {
+      return false;
+    }
+  }
+  return true;
 }
 
 String? _decodeTextFrame(List<int> frame) {
@@ -275,19 +354,67 @@ String? _decodeTextFrame(List<int> frame) {
   final encoding = frame.first;
   final payload = frame.sublist(1);
   try {
-    if (encoding == 0 || encoding == 3) {
-      return utf8
-          .decode(payload, allowMalformed: true)
-          .replaceAll('\u0000', '')
-          .trim();
-    }
-    if (encoding == 1 || encoding == 2) {
-      return String.fromCharCodes(payload).replaceAll('\u0000', '').trim();
+    switch (encoding) {
+      case 0:
+        // The spec says ISO-8859-1, but several tools write UTF-8 here.
+        // Prefer strict UTF-8 and fall back to Latin-1 for accented text.
+        try {
+          return _cleanText(utf8.decode(payload));
+        } on FormatException {
+          return _cleanText(latin1.decode(payload, allowInvalid: true));
+        }
+      case 1:
+        // UTF-16 with a byte order mark.
+        if (payload.length >= 2 && payload[0] == 0xFF && payload[1] == 0xFE) {
+          return _cleanText(_decodeUtf16le(payload.sublist(2)));
+        }
+        if (payload.length >= 2 && payload[0] == 0xFE && payload[1] == 0xFF) {
+          return _cleanText(_decodeUtf16be(payload.sublist(2)));
+        }
+        return _cleanText(_decodeUtf16be(payload));
+      case 2:
+        // UTF-16BE without a byte order mark.
+        return _cleanText(_decodeUtf16be(payload));
+      case 3:
+        return _cleanText(utf8.decode(payload, allowMalformed: true));
     }
   } catch (_) {
     return null;
   }
   return null;
+}
+
+String? _cleanText(String value) {
+  var cleaned = value.replaceAll('\u0000', '');
+  // Drop replacement characters left by an odd trailing byte (some writers
+  // terminate UTF-16 text with a single 0x00 instead of two).
+  cleaned = cleaned.replaceAll(RegExp(r'\uFFFD+$'), '');
+  cleaned = cleaned.trim();
+  return cleaned.isEmpty ? null : cleaned;
+}
+
+/// Decodes UTF-16 little-endian code units. Surrogate pairs pass through
+/// [String.fromCharCodes] unchanged, so non-BMP characters stay intact.
+String _decodeUtf16le(List<int> bytes) {
+  final codeUnits = <int>[];
+  for (var index = 0; index + 1 < bytes.length; index += 2) {
+    codeUnits.add(bytes[index] | (bytes[index + 1] << 8));
+  }
+  if (bytes.length.isOdd) {
+    codeUnits.add(0xFFFD);
+  }
+  return String.fromCharCodes(codeUnits);
+}
+
+String _decodeUtf16be(List<int> bytes) {
+  final codeUnits = <int>[];
+  for (var index = 0; index + 1 < bytes.length; index += 2) {
+    codeUnits.add((bytes[index] << 8) | bytes[index + 1]);
+  }
+  if (bytes.length.isOdd) {
+    codeUnits.add(0xFFFD);
+  }
+  return String.fromCharCodes(codeUnits);
 }
 
 String? _blankToNull(String? value) {

@@ -61,6 +61,15 @@
 - 两项测试结束后删除全部临时歌单并再次对账；Windows 与 Android 均恢复为 1 首歌曲、1 张歌单和 1 个正式音频文件。
 - 模拟器已证明正式 EXE 与 APK 的局域网同步和离线播放链路；实体手机相机权限、二维码扫描和真实 Wi-Fi 体感仍需人工验收。
 
+## 2026-08-14：审查修复与回归
+
+- 修复搜索关键词含 `%` 或 `_` 时结果错误：所有 LIKE 查询补充 `ESCAPE '\'` 子句，`%` 与 `_` 现在按字面匹配，并新增转义回归测试。
+- 重写 MP3 ID3v2 元数据解析：正确处理 UTF-16（含 BOM）、Latin-1 与 UTF-8 文本编码；支持 v2.4 syncsafe 帧长和 10 字节帧头；跳过扩展头并处理 unsynchronisation；帧 ID 校验允许 A-Z 与 0-9。新增 UTF-16 中文标签、Latin-1、v2.4 大帧、扩展头和文件名回退共 5 项测试。
+- Windows 导入时数据库写入失败会删除刚复制的孤儿文件，不再在音乐库目录残留无记录音频。
+- Android 播放器增加文件存在检查与错误流订阅：文件缺失或播放中出错会在界面明确提示，而不是无声停留在"正在播放"。
+- Android 启动恢复会清理 `.sync_trash` 遗留的回收文件，避免崩溃窗口残留占空间。
+- 验证：database 11 项、Windows 15 项、Android 15 项、core 与 sync_protocol 各 3 项测试全部通过；两端 `flutter analyze` 无告警；Windows EXE 与 Android debug APK 已重建并更新到交付目录。
+
 ## 当前交付
 
 - Windows：`release\windows\MusicSyncPlayer\YijiaMusic.exe`
