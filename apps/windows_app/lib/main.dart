@@ -245,7 +245,7 @@ enum _LibrarySongAction {
   playNext,
   addToQueue,
   addToPlaylist,
-  removeFromLibrary,
+  deleteSong,
 }
 
 enum _PlaylistSongAction { playNext, addToQueue, removeFromPlaylist }
@@ -493,10 +493,12 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('移出全部歌曲'),
+        title: const Text('删除歌曲'),
         content: Text(
-          '确定把“${song.title}”从全部歌曲移除吗？\n'
-          '这只会删除本应用音乐库中的记录和复制音频，不会删除你最初导入的原始文件。',
+          '确定从整个应用删除“${song.title}”吗？\n'
+          '全部歌曲、待整理和所有歌单中都不会再显示这首歌，'
+          '并会删除本应用音乐库中的音频副本。\n'
+          '你最初导入的原始文件不会被删除。',
         ),
         actions: [
           TextButton(
@@ -505,7 +507,7 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('移除'),
+            child: const Text('删除'),
           ),
         ],
       ),
@@ -515,27 +517,81 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
     }
 
     try {
-      if (_nowPlaying?.id == song.id) {
+      final wasPlaying = _nowPlaying?.id == song.id;
+      if (wasPlaying) {
         await _player.stop();
-        _nowPlaying = null;
       }
       widget.database.songs.deleteById(song.id);
       final deletedCopy = await _deleteLibraryCopy(song);
       if (!mounted) {
         return;
       }
+      // Drop the deleted song from the playback queue as well.
+      final updatedQueue = List<Song>.from(_queue)
+        ..removeWhere((item) => item.id == song.id);
       setState(() {
+        if (wasPlaying) {
+          _nowPlaying = null;
+          _isPlaybackPaused = false;
+          _playbackPosition = Duration.zero;
+          _playbackDuration = Duration.zero;
+        }
+        _queue = updatedQueue;
+        _queueIndex = _nowPlaying == null
+            ? -1
+            : updatedQueue.indexWhere((item) => item.id == _nowPlaying!.id);
         _status = deletedCopy
-            ? '已从全部歌曲移除：${song.title}。原始导入文件不会删除。'
-            : '已从全部歌曲移除：${song.title}。未删除音频文件，因为它不在本应用音乐库目录。';
+            ? '已删除：${song.title}。原始导入文件不会删除。'
+            : '已删除：${song.title}。音频文件不在本应用音乐库目录，未删除文件。';
       });
       _reloadAll();
     } catch (error) {
       if (!mounted) {
         return;
       }
-      setState(() => _status = '移除失败：$error');
+      setState(() => _status = '删除失败：$error');
     }
+  }
+
+  Widget _songMenu(Song song) {
+    return PopupMenuButton<_LibrarySongAction>(
+      tooltip: '更多操作',
+      onSelected: (action) {
+        switch (action) {
+          case _LibrarySongAction.playNext:
+            _enqueue(song, playNext: true);
+            break;
+          case _LibrarySongAction.addToQueue:
+            _enqueue(song, playNext: false);
+            break;
+          case _LibrarySongAction.addToPlaylist:
+            _addSongToPlaylist(song);
+            break;
+          case _LibrarySongAction.deleteSong:
+            unawaited(_removeSongFromLibrary(song));
+            break;
+        }
+      },
+      itemBuilder: (context) => const [
+        PopupMenuItem(
+          value: _LibrarySongAction.playNext,
+          child: Text('播放下一首'),
+        ),
+        PopupMenuItem(
+          value: _LibrarySongAction.addToQueue,
+          child: Text('加入播放队列'),
+        ),
+        PopupMenuItem(
+          value: _LibrarySongAction.addToPlaylist,
+          child: Text('加入当前歌单'),
+        ),
+        PopupMenuDivider(),
+        PopupMenuItem(
+          value: _LibrarySongAction.deleteSong,
+          child: Text('删除歌曲'),
+        ),
+      ],
+    );
   }
 
   Future<bool> _deleteLibraryCopy(Song song) async {
@@ -1124,44 +1180,7 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
                 title: '全部歌曲',
                 songs: _songs,
                 nowPlayingId: _nowPlaying?.id,
-                trailingBuilder: (song) => PopupMenuButton<_LibrarySongAction>(
-                  tooltip: '更多操作',
-                  onSelected: (action) {
-                    switch (action) {
-                      case _LibrarySongAction.playNext:
-                        _enqueue(song, playNext: true);
-                        break;
-                      case _LibrarySongAction.addToQueue:
-                        _enqueue(song, playNext: false);
-                        break;
-                      case _LibrarySongAction.addToPlaylist:
-                        _addSongToPlaylist(song);
-                        break;
-                      case _LibrarySongAction.removeFromLibrary:
-                        unawaited(_removeSongFromLibrary(song));
-                        break;
-                    }
-                  },
-                  itemBuilder: (context) => const [
-                    PopupMenuItem(
-                      value: _LibrarySongAction.playNext,
-                      child: Text('播放下一首'),
-                    ),
-                    PopupMenuItem(
-                      value: _LibrarySongAction.addToQueue,
-                      child: Text('加入播放队列'),
-                    ),
-                    PopupMenuItem(
-                      value: _LibrarySongAction.addToPlaylist,
-                      child: Text('加入当前歌单'),
-                    ),
-                    PopupMenuDivider(),
-                    PopupMenuItem(
-                      value: _LibrarySongAction.removeFromLibrary,
-                      child: Text('从全部歌曲移除'),
-                    ),
-                  ],
-                ),
+                trailingBuilder: _songMenu,
                 onPlay: (song) => _playSong(song, context: _songs),
               );
               final playlists = _PlaylistPanel(
@@ -1224,6 +1243,7 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
             title: '待整理音频',
             songs: _pendingSongs,
             nowPlayingId: _nowPlaying?.id,
+            trailingBuilder: _songMenu,
             onPlay: (song) => _playSong(song, context: _pendingSongs),
           ),
         ),
@@ -1966,17 +1986,20 @@ class _PlaylistPanel extends StatelessWidget {
                 flex: 1,
                 child: playlists.isEmpty
                     ? const Center(child: Text('暂无歌单'))
-                    : ListView.builder(
-                        itemCount: playlists.length,
-                        itemBuilder: (context, index) {
-                          final playlist = playlists[index];
-                          return ListTile(
-                            dense: true,
-                            selected: playlist.id == selected?.id,
-                            title: Text(playlist.name),
-                            onTap: () => onSelect(playlist),
-                          );
-                        },
+                    : Material(
+                        color: Colors.transparent,
+                        child: ListView.builder(
+                          itemCount: playlists.length,
+                          itemBuilder: (context, index) {
+                            final playlist = playlists[index];
+                            return ListTile(
+                              dense: true,
+                              selected: playlist.id == selected?.id,
+                              title: Text(playlist.name),
+                              onTap: () => onSelect(playlist),
+                            );
+                          },
+                        ),
                       ),
               ),
               const Divider(height: 1),
@@ -1993,63 +2016,69 @@ class _PlaylistPanel extends StatelessWidget {
                 flex: 2,
                 child: selectedSongs.isEmpty
                     ? const Center(child: Text('当前歌单暂无歌曲'))
-                    : ListView.separated(
-                        itemBuilder: (context, index) {
-                          final song = selectedSongs[index];
-                          return GestureDetector(
-                            onDoubleTap: () => onPlaySong(song),
-                            child: ListTile(
-                              dense: true,
-                              selected: song.id == nowPlayingId,
-                              title: Text(song.title),
-                              subtitle: Text(song.artist),
-                              leading: IconButton(
-                                tooltip: '播放',
-                                icon: Icon(
-                                  song.id == nowPlayingId
-                                      ? Icons.equalizer
-                                      : Icons.play_arrow,
+                    : Material(
+                        color: Colors.transparent,
+                        child: ListView.separated(
+                          itemBuilder: (context, index) {
+                            final song = selectedSongs[index];
+                            return GestureDetector(
+                              onDoubleTap: () => onPlaySong(song),
+                              child: ListTile(
+                                dense: true,
+                                selected: song.id == nowPlayingId,
+                                title: Text(song.title),
+                                subtitle: Text(song.artist),
+                                leading: IconButton(
+                                  tooltip: '播放',
+                                  icon: Icon(
+                                    song.id == nowPlayingId
+                                        ? Icons.equalizer
+                                        : Icons.play_arrow,
+                                  ),
+                                  onPressed: () => onPlaySong(song),
                                 ),
-                                onPressed: () => onPlaySong(song),
+                                trailing: PopupMenuButton<
+                                  _PlaylistSongAction
+                                >(
+                                  tooltip: '更多操作',
+                                  onSelected: (action) {
+                                    switch (action) {
+                                      case _PlaylistSongAction.playNext:
+                                        onPlayNext(song);
+                                        break;
+                                      case _PlaylistSongAction.addToQueue:
+                                        onAddToQueue(song);
+                                        break;
+                                      case _PlaylistSongAction
+                                            .removeFromPlaylist:
+                                        onRemoveSong(song);
+                                        break;
+                                    }
+                                  },
+                                  itemBuilder: (context) => const [
+                                    PopupMenuItem(
+                                      value: _PlaylistSongAction.playNext,
+                                      child: Text('播放下一首'),
+                                    ),
+                                    PopupMenuItem(
+                                      value: _PlaylistSongAction.addToQueue,
+                                      child: Text('加入播放队列'),
+                                    ),
+                                    PopupMenuDivider(),
+                                    PopupMenuItem(
+                                      value: _PlaylistSongAction
+                                          .removeFromPlaylist,
+                                      child: Text('从歌单移除'),
+                                    ),
+                                  ],
+                                ),
                               ),
-                              trailing: PopupMenuButton<_PlaylistSongAction>(
-                                tooltip: '更多操作',
-                                onSelected: (action) {
-                                  switch (action) {
-                                    case _PlaylistSongAction.playNext:
-                                      onPlayNext(song);
-                                      break;
-                                    case _PlaylistSongAction.addToQueue:
-                                      onAddToQueue(song);
-                                      break;
-                                    case _PlaylistSongAction.removeFromPlaylist:
-                                      onRemoveSong(song);
-                                      break;
-                                  }
-                                },
-                                itemBuilder: (context) => const [
-                                  PopupMenuItem(
-                                    value: _PlaylistSongAction.playNext,
-                                    child: Text('播放下一首'),
-                                  ),
-                                  PopupMenuItem(
-                                    value: _PlaylistSongAction.addToQueue,
-                                    child: Text('加入播放队列'),
-                                  ),
-                                  PopupMenuDivider(),
-                                  PopupMenuItem(
-                                    value:
-                                        _PlaylistSongAction.removeFromPlaylist,
-                                    child: Text('从歌单移除'),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                        separatorBuilder: (context, index) =>
-                            const Divider(height: 1),
-                        itemCount: selectedSongs.length,
+                            );
+                          },
+                          separatorBuilder: (context, index) =>
+                              const Divider(height: 1),
+                          itemCount: selectedSongs.length,
+                        ),
                       ),
               ),
             ],
@@ -2097,41 +2126,44 @@ class _SongList extends StatelessWidget {
           Expanded(
             child: songs.isEmpty
                 ? const Center(child: Text('暂无内容'))
-                : ListView.separated(
-                    itemBuilder: (context, index) {
-                      final song = songs[index];
-                      final isPlaying = song.id == nowPlayingId;
-                      return GestureDetector(
-                        onDoubleTap: onPlay == null
-                            ? null
-                            : () => onPlay!(song),
-                        child: ListTile(
-                          dense: true,
-                          selected: isPlaying,
-                          title: Text(song.title),
-                          subtitle: Text(
-                            '${song.artist} · ${song.album} · ${song.format.extension.toUpperCase()}',
-                          ),
-                          leading: IconButton(
-                            tooltip: '播放',
-                            icon: Icon(
-                              isPlaying ? Icons.equalizer : Icons.play_arrow,
+                : Material(
+                    color: Colors.transparent,
+                    child: ListView.separated(
+                      itemBuilder: (context, index) {
+                        final song = songs[index];
+                        final isPlaying = song.id == nowPlayingId;
+                        return GestureDetector(
+                          onDoubleTap: onPlay == null
+                              ? null
+                              : () => onPlay!(song),
+                          child: ListTile(
+                            dense: true,
+                            selected: isPlaying,
+                            title: Text(song.title),
+                            subtitle: Text(
+                              '${song.artist} · ${song.album} · ${song.format.extension.toUpperCase()}',
                             ),
-                            onPressed: onPlay == null
-                                ? null
-                                : () => onPlay!(song),
+                            leading: IconButton(
+                              tooltip: '播放',
+                              icon: Icon(
+                                isPlaying ? Icons.equalizer : Icons.play_arrow,
+                              ),
+                              onPressed: onPlay == null
+                                  ? null
+                                  : () => onPlay!(song),
+                            ),
+                            trailing:
+                                trailingBuilder?.call(song) ??
+                                (song.isPendingReview
+                                    ? const Chip(label: Text('待整理'))
+                                    : null),
                           ),
-                          trailing:
-                              trailingBuilder?.call(song) ??
-                              (song.isPendingReview
-                                  ? const Chip(label: Text('待整理'))
-                                  : null),
-                        ),
-                      );
-                    },
-                    separatorBuilder: (context, index) =>
-                        const Divider(height: 1),
-                    itemCount: songs.length,
+                        );
+                      },
+                      separatorBuilder: (context, index) =>
+                          const Divider(height: 1),
+                      itemCount: songs.length,
+                    ),
                   ),
           ),
         ],

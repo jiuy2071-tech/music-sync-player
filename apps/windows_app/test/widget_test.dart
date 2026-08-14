@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:music_core/music_core.dart';
 import 'package:music_database/music_database.dart';
 import 'package:windows_app/audio_import_service.dart';
 import 'package:windows_app/main.dart';
@@ -80,5 +81,55 @@ void main() {
 
     expect(find.text('开启同步模式'), findsOneWidget);
     expect(find.text('复制连接信息'), findsOneWidget);
+  });
+
+  testWidgets('deleting a song removes it from the whole app', (tester) async {
+    final database = MusicDatabase.memory();
+    addTearDown(database.close);
+    // The audio path sits outside the library root so the delete flow skips
+    // real file I/O and can run under the widget-test fake clock.
+    const library = MusicLibraryLocation(rootPath: r'C:\oneplus_test_library');
+
+    final now = DateTime.utc(2026, 8, 14);
+    database.songs.upsert(
+      Song(
+        id: 'song-1',
+        title: 'Unwanted',
+        artist: 'Artist',
+        album: 'Album',
+        format: AudioFormat.mp3,
+        fileSize: 3,
+        fileHash: 'hash-1',
+        localPath: r'D:\outside\library\unwanted.mp3',
+        originalFileName: 'unwanted.mp3',
+        displayNameSource: DisplayNameSource.filename,
+        isPendingReview: false,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+
+    await tester.pumpWidget(
+      WindowsMusicApp(database: database, library: library),
+    );
+    expect(find.text('Unwanted'), findsOneWidget);
+
+    // The row sits inside a double-tap GestureDetector, which holds the
+    // gesture arena until its double-tap timeout expires, so advance the fake
+    // clock past it before expecting the button's onPressed to fire.
+    await tester.tap(find.byTooltip('更多操作'));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('删除歌曲'));
+    await tester.pumpAndSettle();
+
+    // The confirmation dialog explains the destructive effect.
+    expect(find.textContaining('从整个应用删除'), findsOneWidget);
+    await tester.tap(find.text('删除'));
+    await tester.pumpAndSettle();
+
+    expect(database.songs.findById('song-1'), isNull);
+    expect(find.text('Unwanted'), findsNothing);
+    expect(find.textContaining('已删除：Unwanted'), findsOneWidget);
   });
 }

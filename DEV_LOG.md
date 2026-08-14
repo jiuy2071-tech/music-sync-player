@@ -70,6 +70,14 @@
 - Android 启动恢复会清理 `.sync_trash` 遗留的回收文件，避免崩溃窗口残留占空间。
 - 验证：database 11 项、Windows 15 项、Android 15 项、core 与 sync_protocol 各 3 项测试全部通过；两端 `flutter analyze` 无告警；Windows EXE 与 Android debug APK 已重建并更新到交付目录。
 
+## 2026-08-14：整库删除歌曲与桌面快捷方式
+
+- Windows 端新增"删除歌曲"操作：确认后从全部歌曲、待整理和所有歌单中彻底移除，删除本应用音乐库中的音频副本（不删原始导入文件），并从播放队列清除；待整理列表与全部歌曲列表都有该入口。
+- 修复歌单面板与歌曲列表里 ListTile 直接嵌在带背景 DecoratedBox 中导致的 Flutter 调试断言（点击水波纹不可见）。
+- 新增删除流程 widget 回归测试；修复测试中双击手势竞技场持有导致的点击不生效问题。
+- 在桌面创建 `壹加音乐.lnk` 快捷方式，指向 Windows 交付目录的 `YijiaMusic.exe`。
+- 验证：Windows 16 项测试全部通过，`flutter analyze` 无告警；Windows EXE 已重建并更新到交付目录（Android 无代码改动，APK 不变）。
+
 ## 当前交付
 
 - Windows：`release\windows\MusicSyncPlayer\YijiaMusic.exe`
