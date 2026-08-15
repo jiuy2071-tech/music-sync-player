@@ -95,3 +95,4 @@
 - Windows 与 Android Debug APK 重新构建成功，固定验收目录已覆盖并核对 Hash；固定 Windows EXE 启动成功。
 - 固定 APK 已在现有 Android Studio 模拟器上覆盖安装，原有本地歌曲保留，应用进入音乐库且无启动崩溃；实体手机扫码与离线播放仍保留人工验收。
 - 收敛项目知识库：将冗长的阶段计划从 `agent.md` 精简为当前执行规则，增加标准 `AGENTS.md` 入口，并修正数据库、播放器和人工验收说明中的过时描述。
+- 根据 GitHub Actions 的 Node.js 运行时提醒，将官方 `actions/checkout` 从 v4 更新到 v6，消除已淘汰 Node.js 20 的 CI 警告。
