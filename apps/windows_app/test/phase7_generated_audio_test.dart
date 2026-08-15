@@ -71,7 +71,10 @@ void main() {
 
     for (final song in songs) {
       expect(File(song.localPath).existsSync(), isTrue);
-      expect(song.localPath.startsWith(p.join(tempLibrary.path, 'audio')), isTrue);
+      expect(
+        song.localPath.startsWith(p.join(tempLibrary.path, 'audio')),
+        isTrue,
+      );
     }
   });
 

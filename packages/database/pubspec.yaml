@@ -1,8 +1,9 @@
 name: music_database
-description: "A new Flutter package project."
-version: 0.0.1
-homepage:
-publish_to: none
+description: SQLite persistence and search for Yijia Music.
+version: 1.0.0
+homepage: https://github.com/jiuy2071-tech/music-sync-player
+repository: https://github.com/jiuy2071-tech/music-sync-player
+publish_to: 'none'
 
 environment:
   sdk: ^3.12.2
@@ -13,8 +14,7 @@ dependencies:
     sdk: flutter
   music_core:
     path: ../core
-  sqlite3: ^3.3.4
-  sqlite3_flutter_libs: ^0.6.0+eol
+  sqlite3: ^3.5.1
 
 dev_dependencies:
   flutter_test:

@@ -1,7 +1,8 @@
 name: music_sync_protocol
-description: "A new Flutter package project."
-version: 0.0.1
-homepage:
+description: QR and LAN sync protocol models for Yijia Music.
+version: 1.0.0
+homepage: https://github.com/jiuy2071-tech/music-sync-player
+repository: https://github.com/jiuy2071-tech/music-sync-player
 publish_to: 'none'
 
 environment:

@@ -1,5 +1,10 @@
 # music_player
 
-这是预留的播放器抽象位置，当前未被 Windows 或 Android 运行时使用。
+壹加音乐的共享播放契约包，定义播放状态快照和平台播放器接口。
 
-当前 V1 使用平台适配：Windows 通过 `ffplay`，Android 通过 `audioplayers`。不要把本包中的模板 `Calculator` 当作播放器 API；将来真正抽取共享播放器契约时，应先替换该模板并补充单元测试。
+V1 的 Windows 与 Android 仍分别使用 `ffplay` 和 `audioplayers`，暂未强制接入该接口；这里保留的是后续统一播放器行为时可复用的正式契约，不再包含 Flutter 模板代码。
+
+```powershell
+flutter analyze
+flutter test
+```

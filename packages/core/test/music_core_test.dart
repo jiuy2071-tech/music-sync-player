@@ -18,7 +18,7 @@ void main() {
       format: AudioFormat.mp3,
       fileSize: 1234,
       fileHash: 'hash',
-      localPath: r'D:\library\audio\song-1.mp3',
+      localPath: 'library/audio/song-1.mp3',
       originalFileName: '001.mp3',
       displayNameSource: DisplayNameSource.unnamed,
       isPendingReview: true,

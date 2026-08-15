@@ -2,7 +2,7 @@
 
 ## 2026-07-07：基础工程到同步闭环
 
-- 确定正式路径为 `D:\Projects\music_sync_player`，避免中文路径造成 Windows 构建编码问题。
+- 确认 Windows 检出路径不含特殊字符，避免构建链编码问题。
 - 配置 Flutter、Android SDK、Pub 与 Gradle 缓存到 D 盘。
 - 完成共享模型、SQLite、Windows 导入/歌单/播放、Windows 同步服务和 Android 歌单同步/离线播放。
 - 建立 Git 忽略规则，排除 SDK、缓存、构建产物、APK、EXE、release 和生成测试音频。
@@ -80,6 +80,18 @@
 
 ## 当前交付
 
-- Windows：`release\windows\MusicSyncPlayer\YijiaMusic.exe`
-- Android：`release\android\music_sync_player_v1_debug.apk`
+- Windows 本地构建：`apps/windows_app/build/windows/x64/runner/Release/`
+- Android 本地构建：`apps/android_app/build/app/outputs/flutter-apk/app-debug.apk`
 - 详细安装、同步和人工确认清单：`RELEASE_NOTES.md` 与 `testing_notes.md`。
+
+## 2026-08-15：开源仓库整理与安全审查
+
+- README 改为面向公开仓库的克隆、运行、构建和 GitHub Releases 说明，移除本机绝对路径交付方式。
+- 增加 MIT License、`CONTRIBUTING.md`、`SECURITY.md`、GitHub Actions CI 和 `scripts/verify.ps1`。
+- 清理各包模板描述和占位许可证，把 `packages/player` 的 `Calculator` 模板替换为正式播放状态与播放器契约。
+- 升级 `sqlite3` 到 `3.5.1`、`mobile_scanner` 到 `7.4.0`，移除已经无实际作用的 `sqlite3_flutter_libs`。
+- 修复反斜杠搜索、Android 超量下载、同步 JSON 格式检查、连接请求大小限制和服务端内部错误暴露。
+- Windows 整库删除改为先删除应用管理副本、再删除数据库记录；增加受管目录内外文件删除测试。
+- 四个共享包与两个应用的 `flutter analyze` 全部通过，共 54 项测试通过。
+- Windows 与 Android Debug APK 重新构建成功，固定验收目录已覆盖并核对 Hash；固定 Windows EXE 启动成功。
+- 固定 APK 已在现有 Android Studio 模拟器上覆盖安装，原有本地歌曲保留，应用进入音乐库且无启动崩溃；实体手机扫码与离线播放仍保留人工验收。

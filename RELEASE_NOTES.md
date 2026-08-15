@@ -1,67 +1,52 @@
-# 壹加音乐 V1 交付说明
+# 壹加音乐 V1 开发版说明
 
-## 最近构建
+## 2026-08-15 开源整理版
 
-最近一次已验证构建：`2026-08-14`。
+本次把原本面向单机开发环境的项目整理为可以公开阅读、克隆和参与贡献的仓库。源码分支不包含 APK、EXE、ZIP、SDK、音乐样本、数据库或构建缓存；公开二进制文件应通过 [GitHub Releases](https://github.com/jiuy2071-tech/music-sync-player/releases) 单独分发。
 
-| 平台 | 交付文件 | 类型 |
-| --- | --- | --- |
-| Windows | `release\windows\MusicSyncPlayer\YijiaMusic.exe` | 完整 Windows 运行目录中的启动程序 |
-| Android | `release\android\music_sync_player_v1_debug.apk` | Debug APK |
+### 主要变化
 
-`release/` 是本地交付目录，已被 Git 忽略。
+- README 改为标准源码运行和构建说明，不再把某台电脑的绝对路径写成交付入口。
+- 增加 MIT License、贡献说明、安全报告方式、GitHub Actions CI 和一键验证脚本。
+- 清理 Flutter 模板描述与占位许可证，`packages/player` 改为正式播放状态和播放器契约。
+- `sqlite3` 升级到 `3.5.1`，移除已经失效的 `sqlite3_flutter_libs`；`mobile_scanner` 升级到 `7.4.0`。
+- 搜索会把 `%`、`_` 和反斜杠都按普通字符处理。
+- Android 下载过程中会限制实际字节数；服务端发送内容超过 manifest 声明大小时立即停止，不再等超大文件完整落盘。
+- 二维码、连接请求和连接响应增加字段、端口、会话与连接码格式检查。
+- Windows 同步服务限制连接请求大小，返回通用错误，不向局域网客户端暴露内部异常文本。
+- Windows 删除歌曲时先确认应用管理的副本能够删除，再移除数据库记录；源文件仍不会被删除。
+- 新安装的 Windows 音乐库默认使用当前用户应用数据目录，同时兼容旧版目录和环境变量。
 
-## 已完成
+### 已实现功能
 
-- Windows：导入 MP3、FLAC、M4A、WAV；文件夹导入；hash 去重；待整理命名；歌单；搜索；本地播放和播放队列。
-- Windows：Wi-Fi 同步模式、二维码、连接码、歌单清单和受限音频下载。
-- Windows：歌曲列表与待整理列表支持"删除歌曲"，确认后从整个应用移除并删除本应用音乐库中的音频副本（不删原始导入文件）。
-- Android：扫码或手动粘贴连接信息；整张歌单同步；已同步歌曲和歌单搜索；删除本地缓存；离线本地播放。
-- Android：音乐库、歌单、同步音乐三页导航；同步完成后自动刷新本地库；迷你播放器与完整播放面板。
-- 同步安全：临时下载、大小与 Hash 校验、SQLite 事务、强制中断重启恢复、旧文件恢复、空间预检、有限重试、权威歌单版本和孤儿清理。
-- Android：电脑端删除歌单后可对账清理；空歌单可显示；多歌单共用歌曲不会误删。
-- Windows：启动时检查 `ffplay` 和 `ffprobe`，在底部播放器显示真实播放能力。
-- 两端：壹加音乐品牌名称、绿色折面标志和浅色高对比界面。
+- Windows：MP3、FLAC、M4A、WAV 文件/文件夹导入、Hash 去重、待整理命名、整库删除、歌单、搜索、本地播放和播放队列。
+- Windows：临时 Wi-Fi 同步模式、二维码、连接码、权威歌单清单、manifest 和受限音频下载。
+- Android：扫码或手动粘贴连接、整张歌单同步、已同步内容搜索、本地缓存删除和离线播放。
+- 同步安全：临时下载、大小与 SHA-256 校验、SQLite 事务、中断恢复、空间预检、有限重试、歌单版本对账和孤儿清理。
 
-## 启动 Windows
+### 本次验证
 
-1. 打开 `release\windows\MusicSyncPlayer\`。
-2. 双击 `YijiaMusic.exe`。
-3. 用“添加歌曲”导入文件或文件夹；用“Wi-Fi 同步”显示二维码和本次临时连接码。
+- 四个共享包和两个应用的 `flutter analyze` 全部通过。
+- 共 54 项自动测试通过：共享包 20 项、Windows 18 项、Android 16 项。
+- `flutter build windows` 通过。
+- `flutter build apk --debug` 通过。
+- 从本机固定验收目录启动 Windows EXE 成功。
+- 本次 Android APK SHA-256：`FDADF39B4972E9F0293BD4CD94C34ED9A116154F46E2322767F2DA8697C4FEA1`。
 
-Windows 启动时会检查 `ffplay` 和 `ffprobe`。目标机器没有可用 `ffplay` 时，底部播放器会直接提示本地播放不可用，但导入、歌单和同步仍可用；只有 `ffprobe` 缺失时仍能播放。
+标准构建输出：
 
-## 安装 Android
+```text
+apps/windows_app/build/windows/x64/runner/Release/
+apps/android_app/build/app/outputs/flutter-apk/app-debug.apk
+```
 
-1. 把 `release\android\music_sync_player_v1_debug.apk` 复制到手机。
-2. 在 Android 系统中允许安装本地 APK。
-3. 安装后打开“壹加音乐”。
+### 已知限制
 
-## Wi-Fi 同步
-
-1. 让 Windows 电脑和 Android 手机使用同一 Wi-Fi。
-2. Windows 打开“Wi-Fi 同步”。
-3. Android 打开“同步音乐”，优先扫描 Windows 二维码。
-4. 扫码失败时展开手动连接，粘贴 Windows 端复制的完整连接信息；不能只输入 6 位连接码。
-5. 连接后选择整张歌单同步。Android 完成后会自动刷新音乐库并显示本机歌曲数量。
-
-## 自动验证
-
-- Windows：`flutter analyze`、`flutter test`、`flutter build windows`。
-- Android：`flutter analyze`、`flutter test`、`flutter build apk --debug`。
-- 项目内生成 MP3、FLAC、M4A、WAV 的导入、待整理命名、重复检测和 Windows 播放探测。
-- Windows 同步服务与 Android 同步客户端的自动测试。
-- Android 强制中断前后残留恢复，以及真实磁盘旧数据库升级测试。
-- 2026-08-14 修复：搜索关键词中的 `%`/`_` 按字面匹配；MP3 ID3v2 标签支持 UTF-16/Latin-1 编码与 v2.4 syncsafe 帧长；Windows 导入失败不留孤儿文件；Android 播放失败会明确提示；启动时清理 `.sync_trash` 残留。
-- 2026-08-14 固定 Android APK 与本次构建文件 SHA-256 均为 `FC43E58116E9CD8BA2F5EF19A6B1413E3A83D12C40BE7F9E5082B7BF77687801`。
-- 正式 Windows EXE 与 Android 模拟器已完成真实跨进程连接、整张歌单同步、重复同步无重复落盘、空歌单同步、电脑端删除后的自动对账、共用歌曲引用保留、歌单成员变化重同步，以及 Windows 退出后的离线播放验证。
-
-## 仍需真机确认
-
-- Windows 真实文件与文件夹选择器。
-- Android 相机权限和扫描 Windows 二维码。
-- 实体手机在同一 Wi-Fi 下连接、整张歌单下载和同步结果显示。
-- 关闭 Windows 同步模式或断网后的实体手机离线播放。
+- Android APK 仍是 Debug 包，没有应用商店发布签名。
+- 本次固定 APK 已在现有 Android Studio 模拟器上通过 `adb install -r` 覆盖安装，保留原有本地歌曲并正常进入音乐库；启动日志没有 Android 或 Flutter 崩溃。
+- `mobile_scanner 7.4.0` 当前可以构建，但 Flutter 提示该插件未来需要迁移到 Built-in Kotlin；后续升级 Flutter 时需要继续关注插件发布说明。
+- 实体手机上的首次相机权限、二维码扫描、真实 Wi-Fi、覆盖安装和断网离线播放仍需要人工确认；模拟器升级启动不能替代真机验收。
+- Windows 本地播放依赖目标机器可启动 `ffplay`；没有 `ffprobe` 时部分歌曲时长可能无法提前读取。
 
 ## V1 范围外
 

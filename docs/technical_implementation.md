@@ -22,7 +22,7 @@ Windows 和 Android 目前使用各自的播放器适配层：
 
 ### Windows
 
-默认音乐库根目录是 `D:\OnePlusMusic\Library`，可通过 `ONEPLUS_MUSIC_LIBRARY` 覆盖。导入后结构为：
+新安装默认使用当前 Windows 用户的应用数据目录。可通过 `YIJIA_MUSIC_LIBRARY` 覆盖；旧版的 `ONEPLUS_MUSIC_LIBRARY` 环境变量继续兼容。导入后结构为：
 
 ```text
 <library root>/
@@ -127,25 +127,25 @@ Android 的底部导航为：
 
 ## 7. 构建与交付
 
-Flutter 位于 `D:\Dev\flutter`，Android SDK 位于 `D:\Android\Sdk`。交付命令：
+Flutter 和 Android SDK 应通过标准命令行环境提供。验证与构建命令：
 
 ```powershell
-cd D:\Projects\music_sync_player\apps\windows_app
-D:\Dev\flutter\bin\flutter.bat analyze
-D:\Dev\flutter\bin\flutter.bat test
-D:\Dev\flutter\bin\flutter.bat build windows
+cd apps/windows_app
+flutter analyze
+flutter test
+flutter build windows
 
-cd D:\Projects\music_sync_player\apps\android_app
-D:\Dev\flutter\bin\flutter.bat analyze
-D:\Dev\flutter\bin\flutter.bat test
-D:\Dev\flutter\bin\flutter.bat build apk --debug
+cd ../android_app
+flutter analyze
+flutter test
+flutter build apk --debug
 ```
 
-交付时必须复制完整 Windows Release 目录，而不是单独复制 EXE：
+公开二进制文件通过 GitHub Releases 分发，不提交到源码分支。Windows 必须打包完整运行目录，而不是单独复制 EXE：
 
 ```text
-release/windows/MusicSyncPlayer/YijiaMusic.exe
-release/android/music_sync_player_v1_debug.apk
+apps/windows_app/build/windows/x64/runner/Release/
+apps/android_app/build/app/outputs/flutter-apk/app-debug.apk
 ```
 
 `release/`、`build/`、`.dart_tool/`、SDK、缓存、APK 和 EXE 均被 Git 忽略。

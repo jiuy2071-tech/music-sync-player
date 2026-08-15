@@ -5,9 +5,7 @@
 `ffmpeg` and `ffplay` are available on this machine, so Phase 7 generated short,
 non-sensitive test audio inside this project-only folder:
 
-```text
-D:\Projects\music_sync_player\manual_test_audio\
-```
+`manual_test_audio/`
 
 I did not scan Desktop, Downloads, Documents, WeChat, browser data, system music
 libraries, or any other private directory. No real user music files were used.
@@ -141,7 +139,7 @@ running Windows app and an Android device:
 
 - Started the fixed Windows release EXE and enabled its real Wi-Fi sync mode.
 - Confirmed the server listened on all IPv4 interfaces and advertised the
-  physical WLAN address `192.168.84.114`, not the `198.18.0.1` proxy adapter.
+  physical WLAN address, not the `198.18.0.1` proxy adapter.
 - Used the Android app's manual paste fallback with the complete connection
   payload and connected from `emulator-5554` to the running Windows EXE.
 - Android displayed the Windows playlist `新歌单` and synced the entire
@@ -199,3 +197,21 @@ Automated tests currently cover:
 - Startup recovery after a forced stop before or after the SQLite commit marker.
 - Real on-disk old-schema database upgrade with non-empty songs, playlists,
   playlist items and sync cache retained.
+
+## 2026-08-15 Open-Source Readiness Check
+
+- All four shared packages plus the Windows and Android apps passed
+  `flutter analyze`.
+- All 54 automated tests passed: 20 shared-package tests, 18 Windows tests and
+  16 Android tests.
+- New coverage verifies literal backslash search, oversized-download aborts,
+  malformed QR/connect payloads and managed-library file deletion.
+- The Windows Release build and Android Debug APK build both completed.
+- The fixed local Windows acceptance entry started successfully, and the
+  copied delivery files matched the build outputs by SHA-256.
+- The fixed APK was installed over the existing Android Studio emulator with
+  `adb install -r`. Existing local music remained visible, the app reached the
+  library screen, and no Android or Flutter startup crash was logged.
+- Emulator overwrite installation does not verify physical-camera scanning.
+- A physical phone still needs to confirm camera permission, QR scanning,
+  real Wi-Fi transfer, overwrite installation and offline playback feel.

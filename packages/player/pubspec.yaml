@@ -1,7 +1,9 @@
 name: music_player
-description: "A new Flutter package project."
-version: 0.0.1
-homepage:
+description: Reserved shared playback contract package for Yijia Music.
+version: 1.0.0
+homepage: https://github.com/jiuy2071-tech/music-sync-player
+repository: https://github.com/jiuy2071-tech/music-sync-player
+publish_to: 'none'
 
 environment:
   sdk: ^3.12.2
@@ -10,6 +12,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  music_core:
+    path: ../core
 
 dev_dependencies:
   flutter_test:

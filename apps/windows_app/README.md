@@ -12,9 +12,10 @@ Windows 是主音乐库：导入文件或文件夹、管理歌单、播放本地
 ## 验证
 
 ```powershell
-D:\Dev\flutter\bin\flutter.bat analyze
-D:\Dev\flutter\bin\flutter.bat test
-D:\Dev\flutter\bin\flutter.bat build windows
+flutter pub get
+flutter analyze
+flutter test
+flutter build windows
 ```
 
-交付入口：`..\..\release\windows\MusicSyncPlayer\YijiaMusic.exe`。完整 Release 目录必须一并交付；目标机器需要可启动 `ffplay` 才能在 Windows 端播放音乐。
+构建结果位于 `build/windows/x64/runner/Release/`。完整 Release 目录必须一并分发；目标机器需要可启动 `ffplay` 才能在 Windows 端播放音乐。

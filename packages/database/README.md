@@ -7,6 +7,6 @@
 运行检查：
 
 ```powershell
-dart analyze
-dart test
+flutter analyze
+flutter test
 ```

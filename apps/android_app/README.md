@@ -12,9 +12,10 @@ Android 是只读随身播放器：扫码连接 Windows、按整张歌单同步�
 ## 验证
 
 ```powershell
-D:\Dev\flutter\bin\flutter.bat analyze
-D:\Dev\flutter\bin\flutter.bat test
-D:\Dev\flutter\bin\flutter.bat build apk --debug
+flutter pub get
+flutter analyze
+flutter test
+flutter build apk --debug
 ```
 
-交付 APK：`..\..\release\android\music_sync_player_v1_debug.apk`。相机扫码、同一 Wi-Fi 连接和离线播放需在真机上确认。
+Debug APK 位于 `build/app/outputs/flutter-apk/app-debug.apk`。相机扫码、同一 Wi-Fi 连接和离线播放需在真机上确认。

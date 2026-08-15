@@ -57,9 +57,7 @@ void main() {
   test('reads ID3v2.3 Latin-1 tags', () async {
     final file = await writeMp3(
       'latin1.mp3',
-      _v23Tag([
-        _textFrameV23('TIT2', 0, latin1.encode('Café')),
-      ]),
+      _v23Tag([_textFrameV23('TIT2', 0, latin1.encode('Café'))]),
     );
 
     final result = await service.importFiles([file.path]);
@@ -154,13 +152,7 @@ List<int> _be32(int value) => [
 
 List<int> _textFrameV23(String id, int encoding, List<int> textBytes) {
   final data = [encoding, ...textBytes];
-  return [
-    ...ascii.encode(id),
-    ..._be32(data.length),
-    0x00,
-    0x00,
-    ...data,
-  ];
+  return [...ascii.encode(id), ..._be32(data.length), 0x00, 0x00, ...data];
 }
 
 List<int> _textFrameV24(String id, int encoding, List<int> textBytes) {
@@ -213,5 +205,6 @@ List<int> _v24TagWithExtendedHeader(List<List<int>> frames) {
 int _frameBytesLength(List<List<int>> frames) =>
     frames.fold<int>(0, (total, frame) => total + frame.length);
 
-List<int> _flattenFrames(List<List<int>> frames) =>
-    [for (final frame in frames) ...frame];
+List<int> _flattenFrames(List<List<int>> frames) => [
+  for (final frame in frames) ...frame,
+];
