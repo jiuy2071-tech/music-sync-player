@@ -10,7 +10,7 @@ apps/android_app/       Android 只读随身播放器
 packages/core/          Song、Playlist、同步缓存等共享模型
 packages/database/      SQLite 初始化、仓库和搜索
 packages/sync_protocol/ 二维码载荷与连接请求/响应模型
-packages/player/        保留的未来抽象位置，当前未接入生产播放器
+packages/player/        共享播放状态与播放器契约，当前应用仍使用平台适配层
 ```
 
 Windows 和 Android 目前使用各自的播放器适配层：

@@ -28,7 +28,6 @@
 - 连接、清单和文件读取增加 20 秒无响应超时；断连、超时、HTTP 408/429/5xx 最多尝试 3 次，权限错误、危险地址和校验错误不会重试。
 - 新增空间不足提前停止和服务器临时失败后重试成功的自动测试。
 - Android `flutter analyze`、完整 `flutter test` 和 `flutter build apk --debug` 已通过；新的 APK 已更新到本地交付目录。
-- Windows 权威歌单对账、孤儿缓存清理和真机断网回归仍在后续 P0 清单中。
 - Windows `/playlists` 增加权威清单 SHA-256 和每张歌单内容版本；manifest 返回对应版本，Android 会拒绝同步期间发生变化的清单。
 - SQLite 增加 `synced_playlists` 快照表，空歌单同步后可正常显示，并兼容补录旧数据库中的已有非空歌单。
 - Android 连接后会移除 Windows 已删除的本地歌单；孤儿清理按 `playlist_items` 引用判断，共用歌曲保留，最后引用消失后才删除。
@@ -95,3 +94,4 @@
 - 四个共享包与两个应用的 `flutter analyze` 全部通过，共 54 项测试通过。
 - Windows 与 Android Debug APK 重新构建成功，固定验收目录已覆盖并核对 Hash；固定 Windows EXE 启动成功。
 - 固定 APK 已在现有 Android Studio 模拟器上覆盖安装，原有本地歌曲保留，应用进入音乐库且无启动崩溃；实体手机扫码与离线播放仍保留人工验收。
+- 收敛项目知识库：将冗长的阶段计划从 `agent.md` 精简为当前执行规则，增加标准 `AGENTS.md` 入口，并修正数据库、播放器和人工验收说明中的过时描述。

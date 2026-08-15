@@ -65,7 +65,7 @@ Windows import:
 - Confirm imported files are copied into the app library and originals are not
   moved or deleted.
 - Confirm normal filenames are identified conservatively.
-- Confirm numeric, encoded,乱码, or meaningless names become
+- Confirm numeric, encoded, garbled, or meaningless names become
   `未命名音频 001/002/003...` and appear in pending review.
 - Confirm duplicate files are skipped by hash and do not create duplicate songs.
 
@@ -114,13 +114,13 @@ running Windows app and an Android device:
 - Use the real Windows folder picker for folder import.
 - Create and rename multiple playlists through the Windows UI.
 - Confirm Windows UI search behavior visually.
-- Open Windows sync mode and scan or paste the displayed QR payload on Android.
-- Confirm the Android device can reach the Windows machine on the same Wi-Fi.
-- Confirm Android UI shows only synced content after sync.
-- Delete one Android local cache item and confirm the Windows library is
+- On a physical phone, open Windows sync mode and scan the displayed QR code.
+- Confirm the physical phone can reach the Windows machine on the same Wi-Fi.
+- Confirm the physical-phone UI shows only synced content after sync.
+- Delete one physical-phone cache item and confirm the Windows library is
   unchanged.
-- Close Windows sync mode or disconnect Wi-Fi and confirm Android still plays
-  already-synced files offline.
+- Close Windows sync mode or disconnect Wi-Fi and confirm the physical phone
+  still plays already-synced files offline.
 - Install the new APK over a physical Android device that already contains
   synced content and confirm the retained songs still play.
 

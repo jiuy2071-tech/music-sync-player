@@ -1,5 +1,5 @@
 name: music_player
-description: Reserved shared playback contract package for Yijia Music.
+description: Shared playback state and platform-player contract for Yijia Music.
 version: 1.0.0
 homepage: https://github.com/jiuy2071-tech/music-sync-player
 repository: https://github.com/jiuy2071-tech/music-sync-player

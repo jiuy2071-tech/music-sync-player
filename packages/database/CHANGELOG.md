@@ -2,4 +2,4 @@
 
 ## 0.0.1
 
-- Added SQLite schema, repositories, synced-only search and in-memory tests for V1.
+- Added the V1 SQLite schema, repositories, synced-playlist snapshots, synced-only search and in-memory tests.
