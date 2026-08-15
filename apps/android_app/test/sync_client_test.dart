@@ -200,6 +200,50 @@ void main() {
     );
   });
 
+  test(
+    'oversized download is stopped before it can fill local storage',
+    () async {
+      final library = AndroidMusicLibraryLocation(rootPath: tempDir.path);
+      await library.ensureReady();
+      final oldFile = await _seedLocalPlaylist(
+        database: database,
+        library: library,
+        playlistName: 'Before sync',
+        songId: 'old-song',
+        bytes: [7, 7, 7],
+      );
+
+      responseBytes = {'new-song': List<int>.filled(1024 * 1024, 8)};
+      manifestPlaylistName = 'After sync';
+      manifestSongs = () => [
+        _manifestSong(payload: payload, id: 'new-song', expectedBytes: [8, 8]),
+      ];
+
+      await expectLater(
+        _syncRemotePlaylist(
+          client: client,
+          payload: payload,
+          database: database,
+          library: library,
+        ),
+        throwsA(
+          isA<AppError>().having(
+            (error) => error.code,
+            'code',
+            'sync_size_mismatch',
+          ),
+        ),
+      );
+
+      expect(database.playlists.findById('playlist-1')?.name, 'Before sync');
+      expect(await oldFile.readAsBytes(), [7, 7, 7]);
+      expect(
+        await File(p.join(library.audioPath, 'new-song.mp3')).exists(),
+        isFalse,
+      );
+    },
+  );
+
   test('hash mismatch does not replace a playable old cache file', () async {
     final library = AndroidMusicLibraryLocation(rootPath: tempDir.path);
     await library.ensureReady();

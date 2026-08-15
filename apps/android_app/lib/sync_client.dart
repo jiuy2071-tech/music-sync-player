@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
@@ -436,7 +437,11 @@ class AndroidSyncClient {
           ),
         );
         prepared.stagedFile = stagedFile;
-        await _downloadFile(downloadUri, stagedFile);
+        await _downloadFile(
+          downloadUri,
+          stagedFile,
+          expectedSize: prepared.expectedSize,
+        );
         final actualSize = await stagedFile.length();
         if (actualSize != prepared.expectedSize) {
           throw AppError('sync_size_mismatch', '歌曲 ${prepared.song.id} 下载不完整');
@@ -652,11 +657,9 @@ class AndroidSyncClient {
     return _withNetworkRetry(() async {
       final request = await _httpClient.getUrl(uri).timeout(_networkTimeout);
       final response = await request.close().timeout(_networkTimeout);
-      final text = await utf8.decoder
-          .bind(response.timeout(_networkTimeout))
-          .join();
+      final text = await _readResponseText(response);
       _requireSuccessfulResponse(response.statusCode, text);
-      return jsonDecode(text) as Map<String, Object?>;
+      return _decodeJsonObject(text);
     });
   }
 
@@ -669,15 +672,17 @@ class AndroidSyncClient {
       request.headers.contentType = ContentType.json;
       request.write(jsonEncode(body));
       final response = await request.close().timeout(_networkTimeout);
-      final text = await utf8.decoder
-          .bind(response.timeout(_networkTimeout))
-          .join();
+      final text = await _readResponseText(response);
       _requireSuccessfulResponse(response.statusCode, text);
-      return jsonDecode(text) as Map<String, Object?>;
+      return _decodeJsonObject(text);
     });
   }
 
-  Future<void> _downloadFile(Uri uri, File targetFile) async {
+  Future<void> _downloadFile(
+    Uri uri,
+    File targetFile, {
+    required int expectedSize,
+  }) async {
     await targetFile.parent.create(recursive: true);
     await _withNetworkRetry(() async {
       if (await targetFile.exists()) {
@@ -686,9 +691,10 @@ class AndroidSyncClient {
       final request = await _httpClient.getUrl(uri).timeout(_networkTimeout);
       final response = await request.close().timeout(_networkTimeout);
       if (response.statusCode != HttpStatus.ok) {
-        final message = await utf8.decoder
-            .bind(response.timeout(_networkTimeout))
-            .join();
+        final message = await _readResponseText(
+          response,
+          maximumBytes: 64 * 1024,
+        );
         if (_isTransientStatusCode(response.statusCode)) {
           throw _TransientSyncException(
             '同步服务暂时不可用（${response.statusCode}）：$message',
@@ -696,14 +702,49 @@ class AndroidSyncClient {
         }
         throw AppError('sync_download_failed', message);
       }
+      final declaredLength = response.contentLength;
+      if (declaredLength > expectedSize) {
+        throw const AppError('sync_size_mismatch', '下载文件超过同步清单声明的大小');
+      }
       final sink = targetFile.openWrite();
+      var receivedBytes = 0;
       try {
-        await response.timeout(_networkTimeout).pipe(sink);
-      } catch (_) {
+        await for (final chunk in response.timeout(_networkTimeout)) {
+          receivedBytes += chunk.length;
+          if (receivedBytes > expectedSize) {
+            throw const AppError('sync_size_mismatch', '下载文件超过同步清单声明的大小');
+          }
+          sink.add(chunk);
+        }
+        await sink.flush();
+      } catch (error, stackTrace) {
+        await sink.close();
         await targetFile.delete().catchError((_) => targetFile);
-        rethrow;
+        Error.throwWithStackTrace(error, stackTrace);
+      } finally {
+        await sink.close();
+      }
+      if (receivedBytes != expectedSize) {
+        await targetFile.delete().catchError((_) => targetFile);
+        throw const AppError('sync_size_mismatch', '下载文件大小与同步清单不一致');
       }
     });
+  }
+
+  Future<String> _readResponseText(
+    HttpClientResponse response, {
+    int maximumBytes = 2 * 1024 * 1024,
+  }) async {
+    final bytes = BytesBuilder(copy: false);
+    var receivedBytes = 0;
+    await for (final chunk in response.timeout(_networkTimeout)) {
+      receivedBytes += chunk.length;
+      if (receivedBytes > maximumBytes) {
+        throw const AppError('sync_response_too_large', '同步服务返回的数据过大');
+      }
+      bytes.add(chunk);
+    }
+    return utf8.decode(bytes.takeBytes());
   }
 
   Future<T> _withNetworkRetry<T>(Future<T> Function() action) async {
@@ -945,6 +986,18 @@ void _requireSuccessfulResponse(int statusCode, String responseBody) {
       throw _TransientSyncException('同步服务暂时不可用（$statusCode）：$responseBody');
     }
     throw AppError('sync_http_failed', '同步服务返回 $statusCode：$responseBody');
+  }
+}
+
+Map<String, Object?> _decodeJsonObject(String text) {
+  try {
+    final decoded = jsonDecode(text);
+    if (decoded is! Map<String, Object?>) {
+      throw const FormatException('JSON root is not an object');
+    }
+    return decoded;
+  } on FormatException catch (error) {
+    throw AppError('sync_response_invalid', '同步服务返回的数据格式无效', cause: error);
   }
 }
 

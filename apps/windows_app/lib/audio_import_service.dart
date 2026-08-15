@@ -139,13 +139,24 @@ class MusicLibraryLocation {
   String get databasePath => p.join(rootPath, 'library.db');
 
   static Future<MusicLibraryLocation> resolve() async {
-    final configured = Platform.environment['ONEPLUS_MUSIC_LIBRARY'];
+    final configured =
+        Platform.environment['YIJIA_MUSIC_LIBRARY'] ??
+        Platform.environment['ONEPLUS_MUSIC_LIBRARY'];
     if (configured != null && configured.trim().isNotEmpty) {
       return MusicLibraryLocation(rootPath: configured.trim());
     }
-    final base = Directory('D:\\').existsSync()
-        ? p.join('D:\\', 'OnePlusMusic', 'Library')
-        : p.join(Directory.current.path, 'library');
+
+    // Keep existing installations on their original library, but use the
+    // per-user app-data directory for new installations on any drive layout.
+    final legacy = p.join('D:\\', 'OnePlusMusic', 'Library');
+    if (Directory(legacy).existsSync()) {
+      return MusicLibraryLocation(rootPath: legacy);
+    }
+    final localAppData =
+        Platform.environment['LOCALAPPDATA'] ?? Platform.environment['APPDATA'];
+    final base = localAppData == null || localAppData.trim().isEmpty
+        ? p.join(Directory.current.path, 'library')
+        : p.join(localAppData, 'YijiaMusic', 'Library');
     return MusicLibraryLocation(rootPath: base);
   }
 
@@ -199,6 +210,26 @@ if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
       result.stdout.toString(),
     ).map((line) => line.trim()).where((line) => line.isNotEmpty).toList();
   }
+}
+
+Future<bool> deleteManagedLibraryCopy({
+  required Song song,
+  required MusicLibraryLocation library,
+}) async {
+  final file = File(song.localPath);
+  final audioRoot = p.normalize(Directory(library.audioPath).absolute.path);
+  final filePath = p.normalize(file.absolute.path);
+  final rootPrefix = audioRoot.endsWith(p.separator)
+      ? audioRoot
+      : '$audioRoot${p.separator}';
+  if (!filePath.toLowerCase().startsWith(rootPrefix.toLowerCase())) {
+    return false;
+  }
+  if (!await file.exists()) {
+    return false;
+  }
+  await file.delete();
+  return true;
 }
 
 Future<String> _fileHash(File file) async {

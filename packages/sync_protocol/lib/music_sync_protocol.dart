@@ -25,27 +25,49 @@ class SyncQrPayload {
   }
 
   factory SyncQrPayload.fromJson(Map<String, Object?> json) {
-    final app = json['app'] as String?;
-    final version = json['version'] as int?;
+    final app = json['app'];
+    final version = json['version'];
     if (app != syncProtocolAppId || version != syncProtocolVersion) {
       throw const AppError('invalid_qr_payload', '二维码不是当前应用的同步载荷');
     }
+    final host = _requiredString(json, 'host', '二维码缺少电脑地址');
+    final port = json['port'];
+    final sessionId = _requiredString(json, 'session_id', '二维码缺少同步会话');
+    final connectCode = _requiredString(json, 'connect_code', '二维码缺少连接码');
+    if (host.length > 253 || host.contains(RegExp(r'[\s/?#]'))) {
+      throw const AppError('invalid_qr_payload', '二维码中的电脑地址无效');
+    }
+    if (port is! int || port < 1 || port > 65535) {
+      throw const AppError('invalid_qr_payload', '二维码中的端口无效');
+    }
+    if (!_safeSessionId.hasMatch(sessionId)) {
+      throw const AppError('invalid_qr_payload', '二维码中的同步会话无效');
+    }
+    if (!_connectCode.hasMatch(connectCode)) {
+      throw const AppError('invalid_qr_payload', '二维码中的连接码无效');
+    }
     return SyncQrPayload(
-      app: app!,
-      version: version!,
-      host: json['host']! as String,
-      port: json['port']! as int,
-      sessionId: json['session_id']! as String,
-      connectCode: json['connect_code']! as String,
+      app: app as String,
+      version: version as int,
+      host: host,
+      port: port,
+      sessionId: sessionId,
+      connectCode: connectCode,
     );
   }
 
   factory SyncQrPayload.fromJsonText(String value) {
-    final decoded = jsonDecode(value);
-    if (decoded is! Map<String, Object?>) {
-      throw const AppError('invalid_qr_payload', '二维码内容格式无效');
+    try {
+      final decoded = jsonDecode(value);
+      if (decoded is! Map<String, Object?>) {
+        throw const AppError('invalid_qr_payload', '二维码内容格式无效');
+      }
+      return SyncQrPayload.fromJson(decoded);
+    } on AppError {
+      rethrow;
+    } on FormatException catch (error) {
+      throw AppError('invalid_qr_payload', '二维码内容格式无效', cause: error);
     }
-    return SyncQrPayload.fromJson(decoded);
   }
 
   final String app;
@@ -76,10 +98,13 @@ class SyncConnectRequest {
   });
 
   factory SyncConnectRequest.fromJson(Map<String, Object?> json) {
-    return SyncConnectRequest(
-      sessionId: json['session_id']! as String,
-      connectCode: json['connect_code']! as String,
-    );
+    final sessionId = _requiredString(json, 'session_id', '缺少同步会话');
+    final connectCode = _requiredString(json, 'connect_code', '缺少连接码');
+    if (!_safeSessionId.hasMatch(sessionId) ||
+        !_connectCode.hasMatch(connectCode)) {
+      throw const AppError('invalid_connect_request', '连接信息格式无效');
+    }
+    return SyncConnectRequest(sessionId: sessionId, connectCode: connectCode);
   }
 
   final String sessionId;
@@ -94,10 +119,12 @@ class SyncConnectResponse {
   const SyncConnectResponse({required this.ok, required this.message});
 
   factory SyncConnectResponse.fromJson(Map<String, Object?> json) {
-    return SyncConnectResponse(
-      ok: json['ok']! as bool,
-      message: json['message']! as String,
-    );
+    final ok = json['ok'];
+    final message = json['message'];
+    if (ok is! bool || message is! String) {
+      throw const AppError('invalid_connect_response', '同步服务连接响应格式无效');
+    }
+    return SyncConnectResponse(ok: ok, message: message);
   }
 
   final bool ok;
@@ -106,4 +133,15 @@ class SyncConnectResponse {
   Map<String, Object?> toJson() {
     return {'ok': ok, 'message': message};
   }
+}
+
+final RegExp _safeSessionId = RegExp(r'^[A-Za-z0-9_-]{1,128}$');
+final RegExp _connectCode = RegExp(r'^\d{6}$');
+
+String _requiredString(Map<String, Object?> json, String key, String message) {
+  final value = json[key];
+  if (value is! String || value.isEmpty) {
+    throw AppError('invalid_qr_payload', message);
+  }
+  return value;
 }

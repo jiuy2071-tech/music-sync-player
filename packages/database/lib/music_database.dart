@@ -448,7 +448,11 @@ List<Object?> _songArgs(Song song) {
 }
 
 String _likePattern(String keyword) {
-  final escaped = keyword.trim().replaceAll('%', r'\%').replaceAll('_', r'\_');
+  final escaped = keyword
+      .trim()
+      .replaceAll(r'\', r'\\')
+      .replaceAll('%', r'\%')
+      .replaceAll('_', r'\_');
   return '%$escaped%';
 }
 

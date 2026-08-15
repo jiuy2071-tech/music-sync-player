@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -7,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:music_core/music_core.dart';
 import 'package:music_database/music_database.dart';
 import 'package:music_sync_protocol/music_sync_protocol.dart';
-import 'package:path/path.dart' as p;
 import 'package:qr_flutter/qr_flutter.dart';
 
 import 'audio_import_service.dart';
@@ -241,12 +239,7 @@ enum _WindowsPage { library, import, sync }
 
 enum _PlaybackMode { sequence, repeatAll, repeatOne, shuffle }
 
-enum _LibrarySongAction {
-  playNext,
-  addToQueue,
-  addToPlaylist,
-  deleteSong,
-}
+enum _LibrarySongAction { playNext, addToQueue, addToPlaylist, deleteSong }
 
 enum _PlaylistSongAction { playNext, addToQueue, removeFromPlaylist }
 
@@ -521,8 +514,10 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
       if (wasPlaying) {
         await _player.stop();
       }
-      widget.database.songs.deleteById(song.id);
       final deletedCopy = await _deleteLibraryCopy(song);
+      // Remove the database record only after the managed copy is gone. If
+      // disk deletion fails, the song remains visible and the user can retry.
+      widget.database.songs.deleteById(song.id);
       if (!mounted) {
         return;
       }
@@ -573,10 +568,7 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
         }
       },
       itemBuilder: (context) => const [
-        PopupMenuItem(
-          value: _LibrarySongAction.playNext,
-          child: Text('播放下一首'),
-        ),
+        PopupMenuItem(value: _LibrarySongAction.playNext, child: Text('播放下一首')),
         PopupMenuItem(
           value: _LibrarySongAction.addToQueue,
           child: Text('加入播放队列'),
@@ -595,22 +587,7 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
   }
 
   Future<bool> _deleteLibraryCopy(Song song) async {
-    final file = File(song.localPath);
-    final audioRoot = p.normalize(
-      Directory(widget.library.audioPath).absolute.path,
-    );
-    final filePath = p.normalize(file.absolute.path);
-    final rootPrefix = audioRoot.endsWith(p.separator)
-        ? audioRoot
-        : '$audioRoot${p.separator}';
-    if (!filePath.toLowerCase().startsWith(rootPrefix.toLowerCase())) {
-      return false;
-    }
-    if (!await file.exists()) {
-      return false;
-    }
-    await file.delete();
-    return true;
+    return deleteManagedLibraryCopy(song: song, library: widget.library);
   }
 
   Future<void> _playSong(Song song, {List<Song>? context}) async {
@@ -2037,9 +2014,7 @@ class _PlaylistPanel extends StatelessWidget {
                                   ),
                                   onPressed: () => onPlaySong(song),
                                 ),
-                                trailing: PopupMenuButton<
-                                  _PlaylistSongAction
-                                >(
+                                trailing: PopupMenuButton<_PlaylistSongAction>(
                                   tooltip: '更多操作',
                                   onSelected: (action) {
                                     switch (action) {
@@ -2050,7 +2025,7 @@ class _PlaylistPanel extends StatelessWidget {
                                         onAddToQueue(song);
                                         break;
                                       case _PlaylistSongAction
-                                            .removeFromPlaylist:
+                                          .removeFromPlaylist:
                                         onRemoveSong(song);
                                         break;
                                     }

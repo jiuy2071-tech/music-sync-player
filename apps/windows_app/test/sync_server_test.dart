@@ -101,6 +101,27 @@ void main() {
       0,
     );
   });
+
+  test('rejects malformed connect bodies without leaking internals', () async {
+    final session = await server.start();
+    final client = HttpClient();
+    try {
+      final request = await client.postUrl(
+        Uri.parse('http://127.0.0.1:${session.port}/connect'),
+      );
+      request.headers.contentType = ContentType.json;
+      request.write('{not-json');
+      final response = await request.close();
+      final text = await utf8.decoder.bind(response).join();
+      final body = jsonDecode(text) as Map<String, Object?>;
+
+      expect(response.statusCode, HttpStatus.badRequest);
+      expect(body['message'], '请求格式无效');
+      expect(text, isNot(contains('FormatException')));
+    } finally {
+      client.close(force: true);
+    }
+  });
 }
 
 Future<Map<String, Object?>> _postJson(

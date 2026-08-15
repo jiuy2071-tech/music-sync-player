@@ -47,10 +47,51 @@ void main() {
     );
     const response = SyncConnectResponse(ok: true, message: 'connected');
 
-    expect(
-      SyncConnectRequest.fromJson(request.toJson()).connectCode,
-      '123456',
-    );
+    expect(SyncConnectRequest.fromJson(request.toJson()).connectCode, '123456');
     expect(SyncConnectResponse.fromJson(response.toJson()).ok, isTrue);
+  });
+
+  test('rejects malformed or unsafe qr payloads with an app error', () {
+    expect(
+      () => SyncQrPayload.fromJsonText('{not-json'),
+      throwsA(
+        isA<AppError>().having(
+          (error) => error.code,
+          'code',
+          'invalid_qr_payload',
+        ),
+      ),
+    );
+    expect(
+      () => SyncQrPayload.fromJson({
+        'app': syncProtocolAppId,
+        'version': syncProtocolVersion,
+        'host': '192.168.1.10/path',
+        'port': 70000,
+        'session_id': '../session',
+        'connect_code': '123',
+      }),
+      throwsA(isA<AppError>()),
+    );
+  });
+
+  test('rejects malformed connect messages', () {
+    expect(
+      () => SyncConnectRequest.fromJson({
+        'session_id': 'session-1',
+        'connect_code': '12ab56',
+      }),
+      throwsA(
+        isA<AppError>().having(
+          (error) => error.code,
+          'code',
+          'invalid_connect_request',
+        ),
+      ),
+    );
+    expect(
+      () => SyncConnectResponse.fromJson({'ok': 'yes', 'message': true}),
+      throwsA(isA<AppError>()),
+    );
   });
 }

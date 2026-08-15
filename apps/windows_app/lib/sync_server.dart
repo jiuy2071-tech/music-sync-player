@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:music_core/music_core.dart';
@@ -87,38 +88,53 @@ class WindowsSyncServer {
         'ok': false,
         'message': '接口不存在',
       }, statusCode: HttpStatus.notFound);
-    } catch (error) {
+    } catch (_) {
       await _writeJson(request, {
         'ok': false,
-        'message': error.toString(),
+        'message': '同步服务处理请求失败',
       }, statusCode: HttpStatus.internalServerError);
     }
   }
 
   Future<void> _handleConnect(HttpRequest request) async {
-    final body = await utf8.decoder.bind(request).join();
-    final decoded = jsonDecode(body);
-    if (decoded is! Map<String, Object?>) {
+    try {
+      const maximumBodyBytes = 16 * 1024;
+      if (request.contentLength > maximumBodyBytes) {
+        throw const FormatException('request body too large');
+      }
+      final bytes = BytesBuilder(copy: false);
+      var receivedBytes = 0;
+      await for (final chunk in request) {
+        receivedBytes += chunk.length;
+        if (receivedBytes > maximumBodyBytes) {
+          throw const FormatException('request body too large');
+        }
+        bytes.add(chunk);
+      }
+      final decoded = jsonDecode(utf8.decode(bytes.takeBytes()));
+      if (decoded is! Map<String, Object?>) {
+        throw const FormatException('request root is not an object');
+      }
+
+      final connect = SyncConnectRequest.fromJson(decoded);
+      final ok =
+          connect.sessionId == _session?.sessionId &&
+          connect.connectCode == _session?.connectCode;
+      await _writeJson(
+        request,
+        SyncConnectResponse(
+          ok: ok,
+          message: ok ? 'connected' : '连接码无效或同步模式已关闭',
+        ).toJson(),
+        statusCode: ok ? HttpStatus.ok : HttpStatus.forbidden,
+      );
+    } on Object {
       await _writeJson(
         request,
         const SyncConnectResponse(ok: false, message: '请求格式无效').toJson(),
         statusCode: HttpStatus.badRequest,
       );
-      return;
     }
-
-    final connect = SyncConnectRequest.fromJson(decoded);
-    final ok =
-        connect.sessionId == _session?.sessionId &&
-        connect.connectCode == _session?.connectCode;
-    await _writeJson(
-      request,
-      SyncConnectResponse(
-        ok: ok,
-        message: ok ? 'connected' : '连接码无效或同步模式已关闭',
-      ).toJson(),
-      statusCode: ok ? HttpStatus.ok : HttpStatus.forbidden,
-    );
   }
 
   bool _isAuthorized(HttpRequest request) {
@@ -273,6 +289,8 @@ class WindowsSyncServer {
   }) async {
     request.response.statusCode = statusCode;
     request.response.headers.contentType = ContentType.json;
+    request.response.headers.set(HttpHeaders.cacheControlHeader, 'no-store');
+    request.response.headers.set('X-Content-Type-Options', 'nosniff');
     request.response.write(jsonEncode(body));
     await request.response.close();
   }

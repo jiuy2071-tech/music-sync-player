@@ -13,9 +13,7 @@ void main() {
     await tester.pumpWidget(
       WindowsMusicApp(
         database: database,
-        library: const MusicLibraryLocation(
-          rootPath: r'D:\OnePlusMusic\Library',
-        ),
+        library: const MusicLibraryLocation(rootPath: 'test_library'),
       ),
     );
 
@@ -69,9 +67,7 @@ void main() {
     await tester.pumpWidget(
       WindowsMusicApp(
         database: database,
-        library: const MusicLibraryLocation(
-          rootPath: r'D:\OnePlusMusic\Library',
-        ),
+        library: const MusicLibraryLocation(rootPath: 'test_library'),
       ),
     );
 
@@ -86,9 +82,7 @@ void main() {
   testWidgets('deleting a song removes it from the whole app', (tester) async {
     final database = MusicDatabase.memory();
     addTearDown(database.close);
-    // The audio path sits outside the library root so the delete flow skips
-    // real file I/O and can run under the widget-test fake clock.
-    const library = MusicLibraryLocation(rootPath: r'C:\oneplus_test_library');
+    const library = MusicLibraryLocation(rootPath: 'test_library');
 
     final now = DateTime.utc(2026, 8, 14);
     database.songs.upsert(
@@ -100,7 +94,7 @@ void main() {
         format: AudioFormat.mp3,
         fileSize: 3,
         fileHash: 'hash-1',
-        localPath: r'D:\outside\library\unwanted.mp3',
+        localPath: 'outside_library/unwanted.mp3',
         originalFileName: 'unwanted.mp3',
         displayNameSource: DisplayNameSource.filename,
         isPendingReview: false,
