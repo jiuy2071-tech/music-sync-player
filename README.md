@@ -4,7 +4,7 @@
 
 # 壹加音乐
 
-[![CI](https://github.com/jiuy2071-tech/music-sync-player/actions/workflows/ci.yml/badge.svg)](https://github.com/jiuy2071-tech/music-sync-player/actions/workflows/ci.yml)
+[![CI](https://github.com/YZCore/music-sync-player/actions/workflows/ci.yml/badge.svg)](https://github.com/YZCore/music-sync-player/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-2c664c.svg)](LICENSE)
 
 壹加音乐是一个基于 Flutter 的 Windows + Android 本地音乐同步播放器。Windows 保存主音乐库，Android 通过同一 Wi-Fi 按整张歌单同步，之后可以断网离线播放。整个流程不依赖云端，也不会把音乐上传到第三方服务。
@@ -28,11 +28,11 @@ V1 主流程、自动测试、Windows 构建和 Android Debug APK 构建已经�
 ## 获取项目
 
 ```powershell
-git clone https://github.com/jiuy2071-tech/music-sync-player.git
+git clone https://github.com/YZCore/music-sync-player.git
 cd music-sync-player
 ```
 
-公开的预构建版本应从 [GitHub Releases](https://github.com/jiuy2071-tech/music-sync-player/releases) 下载。若 Releases 页面尚无对应附件，请按下面的源码方式运行或构建；仓库不会提交 `build/`、APK、EXE、ZIP、SDK 或本机缓存。
+公开的预构建版本应从 [GitHub Releases](https://github.com/YZCore/music-sync-player/releases) 下载。若 Releases 页面尚无对应附件，请按下面的源码方式运行或构建；仓库不会提交 `build/`、APK、EXE、ZIP、SDK 或本机缓存。
 
 ## 环境要求
 

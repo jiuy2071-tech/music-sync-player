@@ -1,8 +1,8 @@
 name: music_player
 description: Shared playback state and platform-player contract for Yijia Music.
 version: 1.0.0
-homepage: https://github.com/jiuy2071-tech/music-sync-player
-repository: https://github.com/jiuy2071-tech/music-sync-player
+homepage: https://github.com/YZCore/music-sync-player
+repository: https://github.com/YZCore/music-sync-player
 publish_to: 'none'
 
 environment:

@@ -14,7 +14,7 @@
 
 ## 私密报告漏洞
 
-请使用仓库的 [GitHub Security Advisories](https://github.com/jiuy2071-tech/music-sync-player/security/advisories/new) 私密报告安全问题。报告中请包含：
+请使用仓库的 [GitHub Security Advisories](https://github.com/YZCore/music-sync-player/security/advisories/new) 私密报告安全问题。报告中请包含：
 
 - 受影响的平台和提交版本。
 - 可以稳定复现的最小步骤。

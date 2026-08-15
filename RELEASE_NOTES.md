@@ -2,7 +2,7 @@
 
 ## 2026-08-15 开源整理版
 
-本次把原本面向单机开发环境的项目整理为可以公开阅读、克隆和参与贡献的仓库。源码分支不包含 APK、EXE、ZIP、SDK、音乐样本、数据库或构建缓存；公开二进制文件应通过 [GitHub Releases](https://github.com/jiuy2071-tech/music-sync-player/releases) 单独分发。
+本次把原本面向单机开发环境的项目整理为可以公开阅读、克隆和参与贡献的仓库。源码分支不包含 APK、EXE、ZIP、SDK、音乐样本、数据库或构建缓存；公开二进制文件应通过 [GitHub Releases](https://github.com/YZCore/music-sync-player/releases) 单独分发。
 
 ### 主要变化
 
